@@ -18,39 +18,62 @@ const supabase = createClient(
 );
 
 // ── Binance API ──────────────────────────────────────────────
-const BINANCE_TICKER_URL = "https://api.binance.com/api/v3/ticker/24hr";
+const BINANCE_ENDPOINTS = [
+  "https://api.binance.com/api/v3/ticker/24hr",
+  "https://api1.binance.com/api/v3/ticker/24hr",
+  "https://api2.binance.com/api/v3/ticker/24hr",
+  "https://api3.binance.com/api/v3/ticker/24hr",
+];
 
 async function fetchBinanceTickers() {
-  const res = await fetch(BINANCE_TICKER_URL);
-  if (!res.ok) throw new Error(`Binance API error: ${res.status}`);
-  const data = await res.json();
+  let lastError;
 
-  // Chỉ lấy cặp USDT, bỏ đòn bẩy (UPUSDT, DOWNUSDT, BULLUSDT, BEARUSDT)
-  return data.filter(
-    (t) =>
-      t.symbol.endsWith("USDT") &&
-      !t.symbol.match(/(UP|DOWN|BULL|BEAR)USDT$/)
-  );
+  for (const url of BINANCE_ENDPOINTS) {
+    try {
+      console.log(`Trying endpoint: ${url}`);
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; VolumeTracker/1.0)",
+          "Accept": "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        lastError = new Error(`HTTP ${res.status} from ${url}`);
+        console.warn(`Failed: ${lastError.message}`);
+        continue;
+      }
+
+      const data = await res.json();
+
+      return data.filter(
+        (t) =>
+          t.symbol.endsWith("USDT") &&
+          !t.symbol.match(/(UP|DOWN|BULL|BEAR)USDT$/)
+      );
+    } catch (err) {
+      lastError = err;
+      console.warn(`Error with ${url}: ${err.message}`);
+    }
+  }
+
+  throw lastError || new Error("All Binance endpoints failed");
 }
 
-// ── Làm tròn timestamp xuống đầu giờ ────────────────────────
 function floorToHour(date = new Date()) {
   const d = new Date(date);
   d.setMinutes(0, 0, 0);
   return d.toISOString();
 }
 
-// ── Main ─────────────────────────────────────────────────────
 async function main() {
   console.log(`[${new Date().toISOString()}] Starting collection...`);
 
-  // 1. Fetch từ Binance
   const tickers = await fetchBinanceTickers();
   console.log(`Fetched ${tickers.length} USDT pairs from Binance`);
 
   const hourTs = floorToHour();
 
-  // 2. Chuẩn bị payload bulk insert
   const rows = tickers.map((t) => ({
     symbol:       t.symbol,
     price:        parseFloat(t.lastPrice),
@@ -59,29 +82,24 @@ async function main() {
     created_at:   hourTs,
   }));
 
-  // 3. Bulk insert + cleanup cũ chạy song song
   const [insertResult, deleteResult] = await Promise.all([
-    // Insert tất cả trong 1 lần, upsert để tránh duplicate nếu cron bị trigger 2 lần
     supabase
       .from("market_data")
       .upsert(rows, { onConflict: "symbol,created_at" })
       .select("id"),
 
-    // Xóa dữ liệu cũ hơn 15 ngày
     supabase
       .from("market_data")
       .delete()
       .lt("created_at", new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()),
   ]);
 
-  // 4. Kiểm tra kết quả
   if (insertResult.error) {
     console.error("Insert error:", insertResult.error.message);
     process.exit(1);
   }
 
   if (deleteResult.error) {
-    // Không fatal — log và tiếp tục
     console.warn("Cleanup warning:", deleteResult.error.message);
   }
 
