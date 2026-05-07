@@ -1,0 +1,15 @@
+{
+  "name": "binance-volume-tracker",
+  "version": "1.0.0",
+  "description": "Binance Spot Volume Tracker with Supabase",
+  "main": "scripts/collect.js",
+  "scripts": {
+    "collect": "node scripts/collect.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
