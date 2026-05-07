@@ -2,7 +2,6 @@
 node_modules/
 # Sensitive files
 Key.md
-#Tutorial files
 README.md
 # Optional: Database scripts
 supabase_setup.sql

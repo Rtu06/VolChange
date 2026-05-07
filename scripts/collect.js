@@ -5,11 +5,16 @@
  */
 
 const { createClient } = require("@supabase/supabase-js");
+const ws = require("ws");
 
 // ── Supabase client ──────────────────────────────────────────
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY // dùng service key để bypass RLS
+  process.env.SUPABASE_SERVICE_KEY,
+  {
+    global: { fetch },
+    realtime: { transport: ws },
+  }
 );
 
 // ── Binance API ──────────────────────────────────────────────

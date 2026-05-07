@@ -7,7 +7,8 @@
     "collect": "node scripts/collect.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "ws": "^8.16.0"
   },
   "engines": {
     "node": ">=18"
