@@ -1,7 +1,6 @@
 /**
- * collect.js — Binance Volume Collector
+ * collect.js — Binance Volume Collector via CoinGecko
  * Chạy mỗi giờ qua GitHub Actions
- * Thu thập tất cả cặp *USDT trên Binance Spot và lưu vào Supabase
  */
 
 const { createClient } = require("@supabase/supabase-js");
@@ -17,68 +16,84 @@ const supabase = createClient(
   }
 );
 
-// ── Binance API ──────────────────────────────────────────────
-const BINANCE_ENDPOINTS = [
-  "https://api.binance.com/api/v3/ticker/24hr",
-  "https://api1.binance.com/api/v3/ticker/24hr",
-  "https://api2.binance.com/api/v3/ticker/24hr",
-  "https://api3.binance.com/api/v3/ticker/24hr",
-];
+// ── Stablecoin blacklist ─────────────────────────────────────
+const STABLECOINS = new Set([
+  "USDT","USDC","BUSD","DAI","TUSD","USDP","USDD","GUSD","FRAX","LUSD",
+  "SUSD","CUSD","USDJ","USDN","TRIBE","FEI","OUSD","HUSD","USDX","USDK",
+  "FDUSD","PYUSD","EURC","EURS","EURT","XAUT","PAXG","WBTC","WETH","WBNB",
+]);
 
-async function fetchBinanceTickers() {
-  let lastError;
+// ── CoinGecko: lấy tất cả trang của Binance tickers ─────────
+async function fetchCoinGeckoTickers() {
+  const results = [];
+  let page = 1;
+  const perPage = 100;
+  const apiKey = process.env.COINGECKO_API_KEY;
 
-  for (const url of BINANCE_ENDPOINTS) {
-    try {
-      console.log(`Trying endpoint: ${url}`);
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; VolumeTracker/1.0)",
-          "Accept": "application/json",
-        },
-      });
+  while (true) {
+    const url = `https://pro-api.coingecko.com/api/v3/exchanges/binance/tickers?page=${page}&per_page=${perPage}`;
+    console.log(`Fetching page ${page}...`);
 
-      if (!res.ok) {
-        lastError = new Error(`HTTP ${res.status} from ${url}`);
-        console.warn(`Failed: ${lastError.message}`);
-        continue;
-      }
+    const res = await fetch(url, {
+      headers: {
+        "Accept": "application/json",
+        "x-cg-demo-api-key": apiKey,
+      },
+    });
 
-      const data = await res.json();
+    if (!res.ok) throw new Error(`CoinGecko API error: ${res.status}`);
 
-      return data.filter(
-        (t) =>
-          t.symbol.endsWith("USDT") &&
-          !t.symbol.match(/(UP|DOWN|BULL|BEAR)USDT$/)
-      );
-    } catch (err) {
-      lastError = err;
-      console.warn(`Error with ${url}: ${err.message}`);
-    }
+    const data = await res.json();
+    const tickers = data.tickers || [];
+
+    if (tickers.length === 0) break;
+
+    const filtered = tickers.filter(
+      (t) =>
+        t.target === "USDT" &&
+        !STABLECOINS.has(t.base) &&
+        t.converted_volume?.usd > 0
+    );
+
+    results.push(...filtered);
+
+    if (tickers.length < perPage) break;
+
+    page++;
+
+    // Demo key: 30 req/min → delay 2s để an toàn
+    await new Promise((r) => setTimeout(r, 2000));
   }
 
-  throw lastError || new Error("All Binance endpoints failed");
+  return results;
 }
 
+// ── Làm tròn timestamp xuống đầu giờ ────────────────────────
 function floorToHour(date = new Date()) {
   const d = new Date(date);
   d.setMinutes(0, 0, 0);
   return d.toISOString();
 }
 
+// ── Main ─────────────────────────────────────────────────────
 async function main() {
   console.log(`[${new Date().toISOString()}] Starting collection...`);
 
-  const tickers = await fetchBinanceTickers();
-  console.log(`Fetched ${tickers.length} USDT pairs from Binance`);
+  const tickers = await fetchCoinGeckoTickers();
+  console.log(`Fetched ${tickers.length} USDT pairs from CoinGecko (Binance)`);
+
+  if (tickers.length === 0) {
+    console.error("No tickers fetched, aborting.");
+    process.exit(1);
+  }
 
   const hourTs = floorToHour();
 
   const rows = tickers.map((t) => ({
-    symbol:       t.symbol,
-    price:        parseFloat(t.lastPrice),
+    symbol:       `${t.base}USDT`,
+    price:        parseFloat(t.last),
     volume:       parseFloat(t.volume),
-    quote_volume: parseFloat(t.quoteVolume),
+    quote_volume: parseFloat(t.converted_volume?.usd || 0),
     created_at:   hourTs,
   }));
 
@@ -104,7 +119,7 @@ async function main() {
   }
 
   console.log(`✓ Inserted/updated ${rows.length} rows at ${hourTs}`);
-  console.log(`✓ Cleanup executed (records older than 15 days removed)`);
+  console.log(`✓ Cleanup executed`);
   console.log(`[${new Date().toISOString()}] Done.`);
 }
 
