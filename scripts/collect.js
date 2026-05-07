@@ -97,10 +97,19 @@ async function main() {
     created_at:   hourTs,
   }));
 
+  const deduped = Object.values(
+    rows.reduce((acc, row) => {
+      if (!acc[row.symbol] || row.quote_volume > acc[row.symbol].quote_volume) {
+        acc[row.symbol] = row;
+      }
+      return acc;
+    }, {})
+  );
+
   const [insertResult, deleteResult] = await Promise.all([
     supabase
       .from("market_data")
-      .upsert(rows, { onConflict: "symbol,created_at" })
+      .upsert(deduped, { onConflict: "symbol,created_at" })
       .select("id"),
 
     supabase
