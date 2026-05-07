@@ -31,7 +31,7 @@ async function fetchCoinGeckoTickers() {
   const apiKey = process.env.COINGECKO_API_KEY;
 
   while (true) {
-    const url = `https://pro-api.coingecko.com/api/v3/exchanges/binance/tickers?page=${page}&per_page=${perPage}`;
+    const url = `https://api.coingecko.com/api/v3/exchanges/binance/tickers?page=${page}&per_page=${perPage}`;
     console.log(`Fetching page ${page}...`);
 
     const res = await fetch(url, {
