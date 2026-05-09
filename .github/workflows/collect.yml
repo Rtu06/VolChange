@@ -1,13 +1,14 @@
-name: Binance Volume Collector
+name: Binance Daily Volume Collector
 
 on:
   schedule:
-    - cron: '26 * * * *'
+    # Chạy lúc 8:00 SA (UTC+7) = 01:00 UTC mỗi ngày
+    - cron: '0 1 * * *'
   workflow_dispatch:
 
 jobs:
   collect:
-    name: Collect Binance Volume
+    name: Collect Daily Binance Volume
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -24,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run collector
+      - name: Run daily collector
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

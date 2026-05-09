@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Binance Volume Tracker</title>
+<title>Binance Daily Volume Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css">
@@ -15,12 +15,12 @@
 <header>
   <div class="logo">
     <div class="logo-dot"></div>
-    BINANCE VOL TRACKER
+    BINANCE DAILY TRACKER
   </div>
   <div class="header-meta">
     <div class="stat-chip">PAIRS <span id="total-pairs">—</span></div>
-    <div class="stat-chip">UPDATED <span id="last-update">—</span></div>
-    <div class="stat-chip">REFRESH <span id="countdown">—</span></div>
+    <div class="stat-chip">DATE <span id="data-date">—</span></div>
+    <div class="stat-chip">LOADED <span id="last-update">—</span></div>
     <button class="refresh-btn" id="refresh-btn" onclick="loadData()">⟳ REFRESH</button>
   </div>
 </header>
@@ -33,14 +33,14 @@
   </div>
   <span class="sort-label">SORT BY</span>
   <select class="sort-select" id="quick-sort" onchange="applyQuickSort(this.value)">
-    <option value="%1h_desc">%1H ↓ (Top Gainers)</option>
-    <option value="%1h_asc">%1H ↑ (Top Losers)</option>
-    <option value="%4h_desc">%4H ↓</option>
-    <option value="%4h_asc">%4H ↑</option>
-    <option value="%1d_desc">%1D ↓</option>
-    <option value="%1d_asc">%1D ↑</option>
-    <option value="vol1h_desc">Vol 1H ↓</option>
-    <option value="vol1d_desc">Vol 1D ↓</option>
+    <option value="vol1d_desc">Vol 1D ↓ (Highest Volume)</option>
+    <option value="vol1d_asc">Vol 1D ↑ (Lowest Volume)</option>
+    <option value="pctVol1d_desc">%Vol 1D ↓ (Volume Surge)</option>
+    <option value="pctVol1d_asc">%Vol 1D ↑ (Volume Drop)</option>
+    <option value="pctPrice1d_desc">%Price ↓ (Top Gainers)</option>
+    <option value="pctPrice1d_asc">%Price ↑ (Top Losers)</option>
+    <option value="vol7d_desc">Vol 7D ↓</option>
+    <option value="pctVol7d_desc">%Vol 7D ↓</option>
   </select>
   <span class="count-badge">Showing <b id="showing-count">0</b> pairs</span>
 </div>
@@ -54,14 +54,13 @@
   <table id="main-table" style="display:none">
     <thead>
       <tr>
-        <th onclick="sortBy('symbol')" data-col="symbol">SYMBOL <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('price')" data-col="price">PRICE <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('vol1h')" data-col="vol1h" class="group-sep">VOL 1H <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pct1h')" data-col="pct1h" class="active">%1H <span class="sort-arrow">↓</span></th>
-        <th onclick="sortBy('vol4h')" data-col="vol4h" class="group-sep">VOL 4H <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pct4h')" data-col="pct4h">%4H <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('vol1d')" data-col="vol1d" class="group-sep">VOL 1D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pct1d')" data-col="pct1d">%1D <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('symbol')"       data-col="symbol"      >#  SYMBOL <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('price')"        data-col="price"       >PRICE <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('pctPrice1d')"   data-col="pctPrice1d"  >%PRICE 1D <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('vol1d')"        data-col="vol1d"  class="group-sep">VOL 1D <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('pctVol1d')"     data-col="pctVol1d"    >%VOL 1D <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('vol7d')"        data-col="vol7d"  class="group-sep">VOL 7D <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('pctVol7d')"     data-col="pctVol7d"    >%VOL 7D <span class="sort-arrow">↕</span></th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>

@@ -4,4 +4,4 @@ node_modules/
 Key.md
 README.md
 # Optional: Database scripts
-supabase_setup.sql
+reset_table.sql

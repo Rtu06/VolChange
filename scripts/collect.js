@@ -1,6 +1,7 @@
 /**
- * collect.js — Binance Volume Collector via CoinGecko
- * Chạy mỗi giờ qua GitHub Actions
+ * collect.js — Binance Daily Volume Collector via CoinGecko
+ * Chạy lúc 8h sáng mỗi ngày qua GitHub Actions
+ * Lấy dữ liệu NGÀY HÔM TRƯỚC: giá đóng cửa + volume 24h
  */
 
 const { createClient } = require("@supabase/supabase-js");
@@ -23,25 +24,40 @@ const STABLECOINS = new Set([
   "FDUSD","PYUSD","EURC","EURS","EURT","XAUT","PAXG","WBTC","WETH","WBNB",
 ]);
 
-// ── CoinGecko: lấy tất cả trang của Binance tickers ─────────
-async function fetchCoinGeckoTickers() {
+// ── Lấy ngày hôm qua dạng YYYY-MM-DD ────────────────────────
+function getYesterday() {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().split("T")[0]; // "2025-05-08"
+}
+
+// ── CoinGecko: lấy tất cả Binance/USDT tickers ──────────────
+// Endpoint /exchanges/binance/tickers trả về volume 24h rolling
+// và giá last — ta map đây là "ngày hôm qua" vì chạy 8h sáng
+async function fetchBinanceTickers() {
   const results = [];
   let page = 1;
   const perPage = 100;
   const apiKey = process.env.COINGECKO_API_KEY;
 
   while (true) {
-    const url = `https://api.coingecko.com/api/v3/exchanges/binance/tickers?page=${page}&per_page=${perPage}`;
-    console.log(`Fetching page ${page}...`);
+    const url =
+      `https://api.coingecko.com/api/v3/exchanges/binance/tickers` +
+      `?page=${page}&per_page=${perPage}`;
+
+    console.log(`Fetching CoinGecko page ${page}...`);
 
     const res = await fetch(url, {
       headers: {
-        "Accept": "application/json",
+        Accept: "application/json",
         "x-cg-demo-api-key": apiKey,
       },
     });
 
-    if (!res.ok) throw new Error(`CoinGecko API error: ${res.status}`);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`CoinGecko error ${res.status}: ${body}`);
+    }
 
     const data = await res.json();
     const tickers = data.tickers || [];
@@ -58,28 +74,21 @@ async function fetchCoinGeckoTickers() {
     results.push(...filtered);
 
     if (tickers.length < perPage) break;
-
     page++;
 
-    // Demo key: 30 req/min → delay 2s để an toàn
+    // Demo key: 30 req/min → 2s delay
     await new Promise((r) => setTimeout(r, 2000));
   }
 
   return results;
 }
 
-// ── Làm tròn timestamp xuống đầu giờ ────────────────────────
-function floorToHour(date = new Date()) {
-  const d = new Date(date);
-  d.setMinutes(0, 0, 0);
-  return d.toISOString();
-}
-
 // ── Main ─────────────────────────────────────────────────────
 async function main() {
-  console.log(`[${new Date().toISOString()}] Starting collection...`);
+  const yesterday = getYesterday();
+  console.log(`[${new Date().toISOString()}] Collecting data for date: ${yesterday}`);
 
-  const tickers = await fetchCoinGeckoTickers();
+  const tickers = await fetchBinanceTickers();
   console.log(`Fetched ${tickers.length} USDT pairs from CoinGecko (Binance)`);
 
   if (tickers.length === 0) {
@@ -87,48 +96,57 @@ async function main() {
     process.exit(1);
   }
 
-  const hourTs = floorToHour();
-
+  // Map tickers → rows
   const rows = tickers.map((t) => ({
     symbol:       `${t.base}USDT`,
-    price:        parseFloat(t.last),
-    volume:       parseFloat(t.volume),
-    quote_volume: parseFloat(t.converted_volume?.usd || 0),
-    created_at:   hourTs,
+    price:        parseFloat(t.last),                           // giá đóng cửa gần nhất
+    volume:       parseFloat(t.volume),                         // volume base asset 24h
+    quote_volume: parseFloat(t.converted_volume?.usd || 0),     // volume USD 24h
+    date:         yesterday,
   }));
 
+  // Dedup: giữ row có quote_volume cao nhất nếu trùng symbol
   const deduped = Object.values(
     rows.reduce((acc, row) => {
-      if (!acc[row.symbol] || row.quote_volume > acc[row.symbol].quote_volume) {
+      if (
+        !acc[row.symbol] ||
+        row.quote_volume > acc[row.symbol].quote_volume
+      ) {
         acc[row.symbol] = row;
       }
       return acc;
     }, {})
   );
 
-  const [insertResult, deleteResult] = await Promise.all([
-    supabase
-      .from("market_data")
-      .upsert(deduped, { onConflict: "symbol,created_at" })
-      .select("id"),
+  console.log(`Upserting ${deduped.length} rows for ${yesterday}...`);
 
-    supabase
-      .from("market_data")
-      .delete()
-      .lt("created_at", new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()),
-  ]);
+  // Upsert (idempotent nếu chạy lại)
+  const { error: insertErr } = await supabase
+    .from("market_data")
+    .upsert(deduped, { onConflict: "symbol,date" });
 
-  if (insertResult.error) {
-    console.error("Insert error:", insertResult.error.message);
+  if (insertErr) {
+    console.error("Insert error:", insertErr.message);
     process.exit(1);
   }
 
-  if (deleteResult.error) {
-    console.warn("Cleanup warning:", deleteResult.error.message);
+  // Xoá dữ liệu cũ hơn 30 ngày
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+  const cutoffDate = cutoff.toISOString().split("T")[0];
+
+  const { error: deleteErr } = await supabase
+    .from("market_data")
+    .delete()
+    .lt("date", cutoffDate);
+
+  if (deleteErr) {
+    console.warn("Cleanup warning:", deleteErr.message);
+  } else {
+    console.log(`✓ Cleanup: removed rows older than ${cutoffDate}`);
   }
 
-  console.log(`✓ Inserted/updated ${rows.length} rows at ${hourTs}`);
-  console.log(`✓ Cleanup executed`);
+  console.log(`✓ Inserted/updated ${deduped.length} rows for ${yesterday}`);
   console.log(`[${new Date().toISOString()}] Done.`);
 }
 
