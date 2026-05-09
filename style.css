@@ -114,8 +114,9 @@ header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 24px;
-  border-bottom: 1px solid var(--border);
+  margin: 10px 10%; 
+  padding: 10px 15px;
+  border: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
@@ -175,8 +176,9 @@ header {
 
 /* ── Table container ────────────────────────────────────── */
 .table-wrap {
-  overflow-x: auto;
-  padding: 0 0 60px;
+  overflow-x: auto; /* horizontal scroll for small screens */
+  margin: 0 10% 60px; /* extra horizontal padding for better scroll experience */
+  border: 1px solid var(--border);
 }
 
 table {
