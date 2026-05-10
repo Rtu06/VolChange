@@ -13,6 +13,7 @@
   --red:        #ff4757;
   --red-dim:    #ff475718;
   --yellow:     #ffd32a;
+  --yellow-dim: #ffd32a18;
   --mono:       'Space Mono', monospace;
   --sans:       'Inter', sans-serif;
   --col-h: 42px;
@@ -114,7 +115,7 @@ header {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 10px 10%; 
+  margin: 10px 10%;
   padding: 10px 15px;
   border: 1px solid var(--border);
   flex-wrap: wrap;
@@ -174,16 +175,70 @@ header {
 }
 .count-badge b { color: var(--accent); }
 
+/* ── Favorites Only Button ──────────────────────────────── */
+.fav-only-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.fav-only-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.fav-only-btn:not(:disabled):hover {
+  color: var(--yellow);
+  border-color: var(--yellow);
+  background: var(--yellow-dim);
+}
+.fav-only-btn.active {
+  color: var(--yellow);
+  border-color: var(--yellow);
+  background: var(--yellow-dim);
+}
+.fav-btn-star {
+  font-size: 13px;
+  line-height: 1;
+}
+.fav-count-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  background: var(--border2);
+  border-radius: 8px;
+  padding: 0 5px;
+  font-size: 10px;
+  color: var(--text);
+  transition: background 0.15s, color 0.15s;
+}
+.fav-only-btn.active .fav-count-pill {
+  background: var(--yellow);
+  color: #000;
+}
+
 /* ── Table container ────────────────────────────────────── */
 .table-wrap {
-  overflow-x: auto; /* horizontal scroll for small screens */
-  margin: 0 10% 60px; /* extra horizontal padding for better scroll experience */
+  overflow-x: auto;
+  margin: 0 10% 60px;
   border: 1px solid var(--border);
 }
 
 table {
   width: 100%;
-  min-width: 860px;
+  min-width: 900px;
   border-collapse: collapse;
 }
 
@@ -220,6 +275,16 @@ th .sort-arrow {
 }
 th.active .sort-arrow { opacity: 1; }
 
+/* Star column header */
+th.star-col {
+  width: 36px;
+  min-width: 36px;
+  padding: 0 4px 0 16px;
+  color: var(--muted);
+  cursor: default;
+  font-size: 13px;
+}
+
 /* group separator */
 th.group-sep { border-left: 1px solid var(--border2); }
 
@@ -239,20 +304,78 @@ td {
   white-space: nowrap;
   vertical-align: middle;
 }
-td:first-child { text-align: left; padding-left: 24px; }
+td:first-child { text-align: left; padding-left: 10px; }
+td:nth-child(2) { padding-left: 4px; }
 td.group-sep { border-left: 1px solid var(--border); }
 
-/* Rank number */
-.rank {
-  display: inline-block;
-  min-width: 28px;
-  font-size: 10px;
-  color: var(--muted);
-  font-family: var(--mono);
-  text-align: right;
-  margin-right: 6px;
+/* ── Star / Favorite button ─────────────────────────────── */
+.star-cell {
+  width: 36px;
+  min-width: 36px;
+  padding: 0 4px 0 10px !important;
+  text-align: center !important;
 }
 
+.star-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 3px;
+  color: var(--muted);
+  transition: color 0.15s, transform 0.1s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+.star-btn:hover {
+  color: var(--yellow);
+  background: var(--yellow-dim);
+  transform: scale(1.2);
+}
+.star-btn.active {
+  color: var(--yellow);
+}
+.star-btn.active:hover {
+  color: #e6b800;
+  transform: scale(1.1);
+}
+
+/* ── Pinned row highlight ───────────────────────────────── */
+tbody tr.pinned-row {
+  background: rgba(255, 211, 42, 0.03);
+  border-bottom: 1px solid rgba(255, 211, 42, 0.08);
+}
+tbody tr.pinned-row:hover {
+  background: rgba(255, 211, 42, 0.06);
+}
+tbody tr.pinned-row .symbol-name {
+  color: #f0e0a0;
+}
+
+/* ── Separator row between pinned/rest ──────────────────── */
+tr.separator-row {
+  background: transparent !important;
+  border-bottom: 1px solid var(--border2) !important;
+  pointer-events: none;
+}
+tr.separator-row td {
+  padding: 4px 16px;
+  height: 26px;
+}
+.separator-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Symbol cell ────────────────────────────────────────── */
 .symbol-cell {
   display: flex; align-items: center; gap: 6px;
 }

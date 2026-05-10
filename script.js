@@ -7,32 +7,87 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // ── State ──────────────────────────────────────────────────────
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-let allRows    = [];
-let sortCol    = 'vol1d';
-let sortDir    = 'desc';
-let searchTerm = '';
+let allRows        = [];
+let sortCol        = 'pct1h';
+let sortDir        = 'desc';
+let searchTerm     = '';
+let countdownVal   = 300;
+let countdownTimer;
+
+// ══════════════════════════════════════════════════════════════
+// FAVORITES — localStorage key: vt_favorites
+// ══════════════════════════════════════════════════════════════
+const FAV_KEY = 'vt_favorites';
+let favorites  = new Set();          // Set<symbol string>
+let favOnly    = false;              // filter mode
+
+function loadFavorites() {
+  try {
+    const raw = localStorage.getItem(FAV_KEY);
+    favorites = new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    favorites = new Set();
+  }
+}
+
+function saveFavorites() {
+  localStorage.setItem(FAV_KEY, JSON.stringify([...favorites]));
+}
+
+function toggleFavorite(symbol) {
+  if (favorites.has(symbol)) {
+    favorites.delete(symbol);
+  } else {
+    favorites.add(symbol);
+  }
+  saveFavorites();
+  updateFavBadge();
+  renderTable();
+}
+
+function updateFavBadge() {
+  const badge = document.getElementById('fav-count');
+  if (badge) badge.textContent = favorites.size;
+
+  const btn = document.getElementById('fav-only-btn');
+  if (!btn) return;
+  if (favorites.size === 0) {
+    btn.disabled = true;
+    btn.title = 'No favorites yet';
+    if (favOnly) { favOnly = false; btn.classList.remove('active'); }
+  } else {
+    btn.disabled = false;
+    btn.title = favOnly ? 'Show all pairs' : 'Show favorites only';
+  }
+}
+
+function toggleFavOnly() {
+  if (favorites.size === 0) return;
+  favOnly = !favOnly;
+  const btn = document.getElementById('fav-only-btn');
+  btn.classList.toggle('active', favOnly);
+  btn.title = favOnly ? 'Show all pairs' : 'Show favorites only';
+  renderTable();
+}
 
 // ══════════════════════════════════════════════════════════════
 // DATA FETCHING
-// Lấy 15 ngày gần nhất để tính được vol7d current + vol7d prev
 // ══════════════════════════════════════════════════════════════
 
 async function loadData() {
   const btn = document.getElementById('refresh-btn');
   btn.disabled = true;
   showState('loading', 'Fetching data...');
+  resetCountdown();
 
   try {
-    // Lấy 15 ngày để có đủ: 1 ngày hiện tại + 7 ngày curr + 7 ngày prev
-    const since = new Date();
-    since.setUTCDate(since.getUTCDate() - 15);
-    const sinceDate = since.toISOString().split('T')[0];
+    const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
     const { data, error } = await sb
       .from('market_data')
-      .select('symbol, price, quote_volume, date')
-      .gte('date', sinceDate)
-      .order('date', { ascending: false });
+      .select('symbol, price, volume, quote_volume, created_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
     if (!data || data.length === 0) {
@@ -41,15 +96,8 @@ async function loadData() {
     }
 
     allRows = computeRows(data);
-
-    // Hiển thị ngày dữ liệu mới nhất
-    const latestDate = allRows.length > 0
-      ? data.find(d => true)?.date || '—'
-      : '—';
     document.getElementById('total-pairs').textContent = allRows.length;
-    document.getElementById('data-date').textContent   = latestDate;
     document.getElementById('last-update').textContent = formatTime(new Date());
-
     renderTable();
 
   } catch (err) {
@@ -62,23 +110,9 @@ async function loadData() {
 
 // ══════════════════════════════════════════════════════════════
 // COMPUTATION
-//
-// Với dữ liệu daily, mỗi row là 1 ngày:
-//   days[0] = ngày mới nhất (D0 = hôm trước)
-//   days[1] = D-1 (2 ngày trước), ...
-//
-// %Price 1D  = (price[D0] - price[D1]) / price[D1] * 100
-//
-// Vol 1D     = quote_volume[D0]
-// %Vol 1D    = (vol[D0] - vol[D1]) / vol[D1] * 100
-//
-// Vol 7D     = sum(D0..D6)
-// %Vol 7D    = (vol7d_curr - vol7d_prev) / vol7d_prev * 100
-//              vol7d_prev = sum(D7..D13)
 // ══════════════════════════════════════════════════════════════
 
 function computeRows(data) {
-  // Group by symbol, sort by date DESC (newest first)
   const bySymbol = {};
   for (const row of data) {
     if (!bySymbol[row.symbol]) bySymbol[row.symbol] = [];
@@ -88,46 +122,41 @@ function computeRows(data) {
   const results = [];
 
   for (const [symbol, rows] of Object.entries(bySymbol)) {
-    // rows đã sort DESC từ query
-    const n = rows.length;
+    const qv = rows.map(r => r.quote_volume);
+    const n  = qv.length;
 
-    const vol  = (i) => (i < n ? rows[i].quote_volume : null);
-    const pr   = (i) => (i < n ? rows[i].price        : null);
-
+    const t = (i) => (i < n ? qv[i] : null);
     const sumRange = (from, to) => {
       let s = 0, valid = 0;
       for (let i = from; i <= to; i++) {
-        if (vol(i) !== null) { s += vol(i); valid++; }
+        if (t(i) !== null) { s += t(i); valid++; }
       }
       return valid > 0 ? s : null;
     };
-
     const pct = (curr, prev) =>
-      curr !== null && prev !== null && prev !== 0
+      (curr !== null && prev !== null && prev !== 0)
         ? (curr - prev) / prev * 100
         : null;
 
-    // Metrics
-    const price      = pr(0);
-    const pctPrice1d = pct(pr(0), pr(1));
-
-    const vol1d      = vol(0);
-    const pctVol1d   = pct(vol(0), vol(1));
-
-    const vol7d_curr = sumRange(0, 6);
-    const vol7d_prev = sumRange(7, 13);
-    const vol7d      = vol7d_curr;
-    const pctVol7d   = pct(vol7d_curr, vol7d_prev);
+    const vol1h      = t(0);
+    const pct1h      = pct(t(0), t(1));
+    const vol4h_curr = sumRange(0, 3);
+    const vol4h_prev = sumRange(4, 7);
+    const pct4h      = pct(vol4h_curr, vol4h_prev);
+    const vol1d_curr = sumRange(0, 23);
+    const vol1d_prev = sumRange(24, 47);
+    const pct1d      = pct(vol1d_curr, vol1d_prev);
 
     results.push({
       symbol,
-      price,
-      pctPrice1d,
-      vol1d,
-      pctVol1d,
-      vol7d,
-      pctVol7d,
-      _days: n,
+      price: rows[0].price,
+      vol1h,
+      pct1h,
+      vol4h: vol4h_curr,
+      pct4h,
+      vol1d: vol1d_curr,
+      pct1d,
+      _hours: n,
     });
   }
 
@@ -139,13 +168,18 @@ function computeRows(data) {
 // ══════════════════════════════════════════════════════════════
 
 function renderTable() {
-  const q    = searchTerm.toUpperCase();
-  let rows   = q
+  const q = searchTerm.toUpperCase();
+  let rows = q
     ? allRows.filter(r => r.symbol.includes(q))
     : [...allRows];
 
-  // Sort
-  rows.sort((a, b) => {
+  // Filter favorites-only mode
+  if (favOnly) {
+    rows = rows.filter(r => favorites.has(r.symbol));
+  }
+
+  // Sort function
+  const sortFn = (a, b) => {
     const av = a[sortCol];
     const bv = b[sortCol];
     if (av === null && bv === null) return 0;
@@ -154,32 +188,75 @@ function renderTable() {
     if (typeof av === 'string') return sortDir === 'asc'
       ? av.localeCompare(bv) : bv.localeCompare(av);
     return sortDir === 'asc' ? av - bv : bv - av;
-  });
+  };
 
-  document.getElementById('showing-count').textContent = rows.length;
+  // Split into pinned and rest (only when NOT in favOnly mode)
+  let pinnedRows = [];
+  let restRows   = rows;
+
+  if (!favOnly) {
+    pinnedRows = rows.filter(r => favorites.has(r.symbol));
+    restRows   = rows.filter(r => !favorites.has(r.symbol));
+    pinnedRows.sort(sortFn);
+    restRows.sort(sortFn);
+  } else {
+    rows.sort(sortFn);
+    restRows = rows;
+  }
+
+  document.getElementById('showing-count').textContent =
+    pinnedRows.length + restRows.length;
 
   const tbody = document.getElementById('tbody');
-  tbody.innerHTML = rows.map((r, i) => renderRow(r, i + 1)).join('');
+  let html = '';
 
+  // Render pinned section
+  if (pinnedRows.length > 0) {
+    html += pinnedRows.map(r => renderRow(r, true)).join('');
+
+    // Separator row (only if there are also non-pinned rows below)
+    if (restRows.length > 0) {
+      const cols = 9; // total columns including the star col
+      html += `<tr class="separator-row">
+        <td colspan="${cols}">
+          <span class="separator-label">── ALL PAIRS (${restRows.length}) ──</span>
+        </td>
+      </tr>`;
+    }
+  }
+
+  // Render rest
+  html += restRows.map(r => renderRow(r, false)).join('');
+
+  tbody.innerHTML = html;
   hideState();
 }
 
-function renderRow(r, rank) {
-  const base = r.symbol.replace('USDT', '');
-  return `<tr>
+function renderRow(r, isPinned) {
+  const base    = r.symbol.replace('USDT', '');
+  const isFav   = favorites.has(r.symbol);
+  const starCls = isFav ? 'star-btn active' : 'star-btn';
+  const rowCls  = isPinned ? 'pinned-row' : '';
+
+  return `<tr class="${rowCls}">
+    <td class="star-cell">
+      <button class="${starCls}" onclick="toggleFavorite('${r.symbol}')" title="${isFav ? 'Remove from watchlist' : 'Add to watchlist'}">
+        ${isFav ? '★' : '☆'}
+      </button>
+    </td>
     <td>
       <div class="symbol-cell">
-        <span class="rank">${rank}</span>
         <span class="symbol-name">${base}</span>
         <span class="symbol-base">USDT</span>
       </div>
     </td>
     <td class="price-cell">${formatPrice(r.price)}</td>
-    <td>${pctCell(r.pctPrice1d)}</td>
+    <td class="vol-cell group-sep">${formatVol(r.vol1h)}</td>
+    <td>${pctCell(r.pct1h)}</td>
+    <td class="vol-cell group-sep">${formatVol(r.vol4h)}</td>
+    <td>${pctCell(r.pct4h)}</td>
     <td class="vol-cell group-sep">${formatVol(r.vol1d)}</td>
-    <td>${pctCell(r.pctVol1d)}</td>
-    <td class="vol-cell group-sep">${formatVol(r.vol7d)}</td>
-    <td>${pctCell(r.pctVol7d)}</td>
+    <td>${pctCell(r.pct1d)}</td>
   </tr>`;
 }
 
@@ -189,18 +266,18 @@ function renderRow(r, rank) {
 
 function formatPrice(p) {
   if (p === null) return '<span class="na">—</span>';
-  if (p >= 1000)  return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  if (p >= 1)     return '$' + p.toFixed(4);
-  if (p >= 0.001) return '$' + p.toFixed(6);
-  return '$' + p.toExponential(4);
+  if (p >= 1000)  return p.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (p >= 1)     return p.toFixed(4);
+  if (p >= 0.001) return p.toFixed(6);
+  return p.toExponential(4);
 }
 
 function formatVol(v) {
   if (v === null) return '<span class="na">—</span>';
-  if (v >= 1e9) return `$${(v/1e9).toFixed(2)}<span class="unit">B</span>`;
-  if (v >= 1e6) return `$${(v/1e6).toFixed(2)}<span class="unit">M</span>`;
-  if (v >= 1e3) return `$${(v/1e3).toFixed(1)}<span class="unit">K</span>`;
-  return '$' + v.toFixed(0);
+  if (v >= 1e9) return `${(v/1e9).toFixed(2)}<span class="unit">B</span>`;
+  if (v >= 1e6) return `${(v/1e6).toFixed(2)}<span class="unit">M</span>`;
+  if (v >= 1e3) return `${(v/1e3).toFixed(1)}<span class="unit">K</span>`;
+  return v.toFixed(0);
 }
 
 function pctCell(v) {
@@ -244,10 +321,12 @@ function updateSortHeaders() {
 }
 
 function applyQuickSort(val) {
-  const lastUnderscore = val.lastIndexOf('_');
-  const col = val.substring(0, lastUnderscore);
-  const dir = val.substring(lastUnderscore + 1);
-  sortCol = col;
+  const [col, dir] = val.split('_');
+  const map = {
+    '%1h': 'pct1h', '%4h': 'pct4h', '%1d': 'pct1d',
+    'vol1h': 'vol1h', 'vol1d': 'vol1d',
+  };
+  sortCol = map[col] || col;
   sortDir = dir;
   updateSortHeaders();
   if (allRows.length) renderTable();
@@ -282,6 +361,24 @@ function hideState() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// AUTO REFRESH COUNTDOWN (5 min)
+// ══════════════════════════════════════════════════════════════
+
+function resetCountdown() {
+  clearInterval(countdownTimer);
+  countdownVal = 300;
+  countdownTimer = setInterval(() => {
+    countdownVal--;
+    const m = Math.floor(countdownVal / 60);
+    const s = String(countdownVal % 60).padStart(2, '0');
+    document.getElementById('countdown').textContent = `${m}:${s}`;
+    if (countdownVal <= 0) loadData();
+  }, 1000);
+}
+
+// ══════════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════════
+loadFavorites();
+updateFavBadge();
 loadData();

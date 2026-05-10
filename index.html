@@ -42,6 +42,20 @@
     <option value="vol7d_desc">Vol 7D ↓</option>
     <option value="pctVol7d_desc">%Vol 7D ↓</option>
   </select>
+
+  <!-- ★ FAVORITES FILTER BUTTON -->
+  <button
+    class="fav-only-btn"
+    id="fav-only-btn"
+    onclick="toggleFavOnly()"
+    disabled
+    title="No favorites yet"
+  >
+    <span class="fav-btn-star">★</span>
+    WATCHLIST
+    <span class="fav-count-pill"><span id="fav-count">0</span></span>
+  </button>
+
   <span class="count-badge">Showing <b id="showing-count">0</b> pairs</span>
 </div>
 
@@ -54,13 +68,15 @@
   <table id="main-table" style="display:none">
     <thead>
       <tr>
-        <th onclick="sortBy('symbol')"       data-col="symbol"      >#  SYMBOL <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('price')"        data-col="price"       >PRICE <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctPrice1d')"   data-col="pctPrice1d"  >%PRICE 1D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('vol1d')"        data-col="vol1d"  class="group-sep">VOL 1D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctVol1d')"     data-col="pctVol1d"    >%VOL 1D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('vol7d')"        data-col="vol7d"  class="group-sep">VOL 7D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctVol7d')"     data-col="pctVol7d"    >%VOL 7D <span class="sort-arrow">↕</span></th>
+        <th class="star-col" title="Favorites">★</th>
+        <th onclick="sortBy('symbol')"      data-col="symbol"    >#  SYMBOL <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('price')"       data-col="price"     >PRICE <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('vol1h')"       data-col="vol1h" class="group-sep">VOL 1H <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('pct1h')"       data-col="pct1h"     >%VOL 1H <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('vol4h')"       data-col="vol4h" class="group-sep">VOL 4H <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('pct4h')"       data-col="pct4h"     >%VOL 4H <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('vol1d')"       data-col="vol1d" class="group-sep">VOL 1D <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('pct1d')"       data-col="pct1d"     >%VOL 1D <span class="sort-arrow">↕</span></th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
