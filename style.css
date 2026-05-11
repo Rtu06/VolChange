@@ -60,7 +60,7 @@ header {
 
 .logo {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.05em;
   color: var(--accent);
@@ -78,6 +78,57 @@ header {
 @keyframes pulse {
   0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--accent); }
   50%       { opacity: 0.6; box-shadow: 0 0 0 4px transparent; }
+}
+
+/* Container chứa cả dấu hỏi và bảng thông báo */
+.tooltip-container {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+}
+
+/* Tạo hình tròn dấu chấm hỏi */
+.question-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #ffffff;
+  border-radius: 50%;
+  color: #ffffff;
+  font-weight: bold;
+  font-family: sans-serif;
+  flex-shrink: 0;        /* Giữ nguyên hình tròn, không bị bẹp */
+  font-size: 8px;
+}
+
+/* Bảng thông báo (ẩn mặc định) */
+.tooltip-box {
+  visibility: hidden;
+  width: max-content;     /* Xóa width cố định, dùng width: max-content để ôm khít chữ */
+  max-width: 250px;       /* Giới hạn chiều rộng tối đa để không bị quá dài trên màn hình */
+  white-space: normal;    /* Cho phép xuống dòng nếu nội dung vượt quá max-width */
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 8px;
+  position: absolute;
+  z-index: 1;
+  top: 125%; /* Hiện lên phía dưới dấu hỏi */
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  font-size: 14px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* Hiển thị bảng thông báo khi di chuột vào container */
+.tooltip-container:hover .tooltip-box {
+  visibility: visible;
+  opacity: 1;
 }
 
 .header-meta {
