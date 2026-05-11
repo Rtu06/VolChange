@@ -13,6 +13,40 @@ let sortDir    = 'desc';
 let searchTerm = '';
 
 // ══════════════════════════════════════════════════════════════
+// FAVORITES  (localStorage)
+// ══════════════════════════════════════════════════════════════
+const LS_KEY = 'bvt_favorites';
+let favorites    = new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]'));
+let favFilterOn  = false;
+
+function saveFavorites() {
+  localStorage.setItem(LS_KEY, JSON.stringify([...favorites]));
+}
+
+function toggleFavorite(symbol) {
+  if (favorites.has(symbol)) {
+    favorites.delete(symbol);
+  } else {
+    favorites.add(symbol);
+  }
+  saveFavorites();
+  updateFavCount();
+  renderTable();
+}
+
+function toggleFavFilter() {
+  favFilterOn = !favFilterOn;
+  const btn = document.getElementById('fav-filter-btn');
+  btn.classList.toggle('active', favFilterOn);
+  if (allRows.length) renderTable();
+}
+
+function updateFavCount() {
+  const el = document.getElementById('fav-count');
+  el.textContent = favorites.size > 0 ? `(${favorites.size})` : '';
+}
+
+// ══════════════════════════════════════════════════════════════
 // DATA FETCHING
 // Lấy 15 ngày gần nhất để tính được vol7d current + vol7d prev
 // ══════════════════════════════════════════════════════════════
@@ -50,6 +84,7 @@ async function loadData() {
     document.getElementById('data-date').textContent   = latestDate;
     document.getElementById('last-update').textContent = formatTime(new Date());
 
+    updateFavCount();
     renderTable();
 
   } catch (err) {
@@ -139,10 +174,15 @@ function computeRows(data) {
 // ══════════════════════════════════════════════════════════════
 
 function renderTable() {
-  const q    = searchTerm.toUpperCase();
-  let rows   = q
+  const q  = searchTerm.toUpperCase();
+  let rows = q
     ? allRows.filter(r => r.symbol.includes(q))
     : [...allRows];
+
+  // Nếu đang bật watchlist-only, chỉ giữ các coin favorite
+  if (favFilterOn) {
+    rows = rows.filter(r => favorites.has(r.symbol));
+  }
 
   // Sort
   rows.sort((a, b) => {
@@ -156,19 +196,62 @@ function renderTable() {
     return sortDir === 'asc' ? av - bv : bv - av;
   });
 
+  // Tách favorites lên đầu (chỉ khi không đang filter watchlist-only)
+  if (!favFilterOn) {
+    const favRows    = rows.filter(r => favorites.has(r.symbol));
+    const normalRows = rows.filter(r => !favorites.has(r.symbol));
+    rows = [...favRows, ...normalRows];
+  }
+
   document.getElementById('showing-count').textContent = rows.length;
 
   const tbody = document.getElementById('tbody');
-  tbody.innerHTML = rows.map((r, i) => renderRow(r, i + 1)).join('');
+
+  // Render với divider nếu có favorites và không đang filter
+  if (!favFilterOn && favorites.size > 0) {
+    const favRows    = rows.filter(r => favorites.has(r.symbol));
+    const normalRows = rows.filter(r => !favorites.has(r.symbol));
+
+    let html = '';
+
+    if (favRows.length > 0) {
+      html += renderDivider('★ WATCHLIST', favRows.length);
+      html += favRows.map((r, i) => renderRow(r, i + 1)).join('');
+    }
+
+    if (normalRows.length > 0) {
+      html += renderDivider('ALL PAIRS', normalRows.length);
+      html += normalRows.map((r, i) => renderRow(r, i + 1)).join('');
+    }
+
+    tbody.innerHTML = html;
+  } else {
+    tbody.innerHTML = rows.map((r, i) => renderRow(r, i + 1)).join('');
+  }
 
   hideState();
 }
 
+function renderDivider(label, count) {
+  return `<tr class="section-divider">
+    <td colspan="7">
+      <span class="divider-label">${label}</span>
+      <span class="divider-count">${count}</span>
+    </td>
+  </tr>`;
+}
+
 function renderRow(r, rank) {
-  const base = r.symbol.replace('USDT', '');
-  return `<tr>
+  const base    = r.symbol.replace('USDT', '');
+  const isFav   = favorites.has(r.symbol);
+  const favClass = isFav ? ' fav-row' : '';
+  const starClass = isFav ? 'star-btn active' : 'star-btn';
+  const starIcon  = isFav ? '★' : '☆';
+
+  return `<tr class="${favClass}">
     <td>
       <div class="symbol-cell">
+        <button class="${starClass}" onclick="toggleFavorite('${r.symbol}')" title="Add to watchlist">${starIcon}</button>
         <span class="rank">${rank}</span>
         <span class="symbol-name">${base}</span>
         <span class="symbol-base">USDT</span>

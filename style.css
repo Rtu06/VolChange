@@ -13,6 +13,7 @@
   --red:        #ff4757;
   --red-dim:    #ff475718;
   --yellow:     #ffd32a;
+  --yellow-dim: #ffd32a18;
   --mono:       'Space Mono', monospace;
   --sans:       'Inter', sans-serif;
   --col-h: 42px;
@@ -165,6 +166,37 @@ header {
 }
 .sort-select:focus { border-color: var(--accent); }
 
+/* ── Watchlist filter button ────────────────────────────── */
+.fav-filter-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.fav-filter-btn:hover {
+  color: var(--yellow);
+  border-color: var(--yellow);
+  background: var(--yellow-dim);
+}
+.fav-filter-btn.active {
+  color: var(--yellow);
+  border-color: var(--yellow);
+  background: var(--yellow-dim);
+}
+#fav-count {
+  color: var(--yellow);
+  font-size: 10px;
+}
+
 .count-badge {
   font-family: var(--mono);
   font-size: 11px;
@@ -292,6 +324,65 @@ td.group-sep { border-left: 1px solid var(--border); }
 }
 .pct-cell.neu { color: var(--muted); }
 .pct-cell.na  { color: var(--muted); font-size: 10px; font-weight: 400; }
+
+/* ── Star / Favorite button ─────────────────────────────── */
+.star-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--border2);
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 2px;
+  transition: color 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+.star-btn:hover {
+  color: var(--yellow);
+  transform: scale(1.2);
+}
+.star-btn.active {
+  color: var(--yellow);
+}
+
+/* ── Favorite row highlight ─────────────────────────────── */
+tbody tr.fav-row {
+  background: rgba(255, 211, 42, 0.03);
+  border-left: 2px solid var(--yellow);
+}
+tbody tr.fav-row:hover {
+  background: rgba(255, 211, 42, 0.06);
+}
+
+/* ── Section divider row ────────────────────────────────── */
+tbody tr.section-divider {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border2);
+  border-top: 1px solid var(--border2);
+  cursor: default;
+}
+tbody tr.section-divider:hover { background: var(--surface); }
+tbody tr.section-divider td {
+  height: 28px;
+  padding: 0 24px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.divider-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--yellow);
+}
+.divider-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
 
 /* ── Loading / Error / Empty states ────────────────────── */
 .state-overlay {
