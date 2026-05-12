@@ -38,17 +38,6 @@
     <span class="search-icon">⌕</span>
     <input class="search-input" id="search" type="text" placeholder="Search symbol... e.g. BTC" />
   </div>
-  <span class="sort-label">SORT BY</span>
-  <select class="sort-select" id="quick-sort" onchange="applyQuickSort(this.value)">
-    <option value="vol1d_desc">Vol 1D ↓ (Highest Volume)</option>
-    <option value="vol1d_asc">Vol 1D ↑ (Lowest Volume)</option>
-    <option value="pctVol1d_desc">%Vol 1D ↓ (Volume Surge)</option>
-    <option value="pctVol1d_asc">%Vol 1D ↑ (Volume Drop)</option>
-    <option value="pctPrice1d_desc">%Price ↓ (Top Gainers)</option>
-    <option value="pctPrice1d_asc">%Price ↑ (Top Losers)</option>
-    <option value="vol7d_desc">Vol 7D ↓</option>
-    <option value="pctVol7d_desc">%Vol 7D ↓</option>
-  </select>
   <!-- ── Favorite filter button ── -->
   <button class="fav-filter-btn" id="fav-filter-btn" onclick="toggleFavFilter()">
     ★ WATCHLIST <span id="fav-count"></span>

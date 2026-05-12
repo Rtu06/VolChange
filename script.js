@@ -326,16 +326,6 @@ function updateSortHeaders() {
   });
 }
 
-function applyQuickSort(val) {
-  const lastUnderscore = val.lastIndexOf('_');
-  const col = val.substring(0, lastUnderscore);
-  const dir = val.substring(lastUnderscore + 1);
-  sortCol = col;
-  sortDir = dir;
-  updateSortHeaders();
-  if (allRows.length) renderTable();
-}
-
 document.getElementById('search').addEventListener('input', e => {
   searchTerm = e.target.value;
   if (allRows.length) renderTable();
