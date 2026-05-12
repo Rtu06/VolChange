@@ -48,7 +48,9 @@ function updateFavCount() {
 
 // ══════════════════════════════════════════════════════════════
 // DATA FETCHING
+// Lấy 7 ngày gần nhất để tính được vol3d current + vol3d prev
 // Lấy 15 ngày gần nhất để tính được vol7d current + vol7d prev
+// Lấy thêm 1 ngày vì ngày hiện tại không tính
 // ══════════════════════════════════════════════════════════════
 
 async function loadData() {
@@ -110,6 +112,10 @@ async function loadData() {
 // Vol 7D     = sum(D0..D6)
 // %Vol 7D    = (vol7d_curr - vol7d_prev) / vol7d_prev * 100
 //              vol7d_prev = sum(D7..D13)
+//
+// Vol 3D     = sum(D0..D2)
+// %Vol 3D    = (vol3d_curr - vol3d_prev) / vol3d_prev * 100
+//              vol3d_prev = sum(D3..D5)
 // ══════════════════════════════════════════════════════════════
 
 function computeRows(data) {
@@ -149,10 +155,16 @@ function computeRows(data) {
     const vol1d      = vol(0);
     const pctVol1d   = pct(vol(0), vol(1));
 
+    const vol3d_curr = sumRange(0, 2);
+    const vol3d_prev = sumRange(3, 5);
+    const vol3d      = vol3d_curr;
+    const pctVol3d   = pct(vol3d_curr, vol3d_prev);
+
     const vol7d_curr = sumRange(0, 6);
     const vol7d_prev = sumRange(7, 13);
     const vol7d      = vol7d_curr;
     const pctVol7d   = pct(vol7d_curr, vol7d_prev);
+
 
     results.push({
       symbol,
@@ -160,6 +172,8 @@ function computeRows(data) {
       pctPrice1d,
       vol1d,
       pctVol1d,
+      vol3d,
+      pctVol3d,
       vol7d,
       pctVol7d,
       _days: n,
@@ -261,6 +275,8 @@ function renderRow(r, rank) {
     <td>${pctCell(r.pctPrice1d)}</td>
     <td class="vol-cell group-sep">${formatVol(r.vol1d)}</td>
     <td>${pctCell(r.pctVol1d)}</td>
+    <td class="vol-cell group-sep">${formatVol(r.vol3d)}</td>
+    <td>${pctCell(r.pctVol3d)}</td>
     <td class="vol-cell group-sep">${formatVol(r.vol7d)}</td>
     <td>${pctCell(r.pctVol7d)}</td>
   </tr>`;
