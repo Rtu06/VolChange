@@ -433,10 +433,10 @@ function updateSortHeaders() {
     const arrow = th.querySelector('.sort-arrow');
     if (col === sortCol) {
       th.classList.add('active');
-      arrow.textContent = sortDir === 'desc' ? '↓' : '↑';
+      if (arrow) arrow.textContent = sortDir === 'desc' ? '↓' : '↑';
     } else {
       th.classList.remove('active');
-      arrow.textContent = '↕';
+      if (arrow) arrow.textContent = '↕';
     }
   });
 }
