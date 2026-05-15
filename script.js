@@ -7,10 +7,12 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // ── State ──────────────────────────────────────────────────────
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-let allRows    = [];
-let sortCol    = 'vol1d';
-let sortDir    = 'desc';
-let searchTerm = '';
+let allRows     = [];
+let sortCol     = 'vol1d';
+let sortDir     = 'desc';
+let searchTerm  = '';
+let currentPage = 1;
+const PAGE_SIZE = 100;
 
 // ══════════════════════════════════════════════════════════════
 // FAVORITES  (localStorage)
@@ -36,6 +38,7 @@ function toggleFavorite(symbol) {
 
 function toggleFavFilter() {
   favFilterOn = !favFilterOn;
+  currentPage = 1;
   const btn = document.getElementById('fav-filter-btn');
   btn.classList.toggle('active', favFilterOn);
   if (allRows.length) renderTable();
@@ -217,7 +220,19 @@ function renderTable() {
     rows = [...favRows, ...normalRows];
   }
 
-  document.getElementById('showing-count').textContent = rows.length;
+  // ── Pagination ────────────────────────────────────────────
+  const totalRows  = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  // Clamp trang hiện tại nếu filter làm giảm số trang
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end   = start + PAGE_SIZE;
+
+  // Rank offset: số thứ tự bắt đầu từ vị trí thực trong toàn bộ danh sách
+  const rankOffset = start;
+
+  document.getElementById('showing-count').textContent = totalRows;
 
   const tbody = document.getElementById('tbody');
 
@@ -226,24 +241,97 @@ function renderTable() {
     const favRows    = rows.filter(r => favorites.has(r.symbol));
     const normalRows = rows.filter(r => !favorites.has(r.symbol));
 
+    // Tính page slice trên toàn bộ rows (bao gồm cả 2 nhóm)
+    const pageRows = rows.slice(start, end);
     let html = '';
 
-    if (favRows.length > 0) {
-      html += renderDivider('★ WATCHLIST', favRows.length);
-      html += favRows.map((r, i) => renderRow(r, i + 1)).join('');
+    // Kiểm tra xem page này có chứa fav rows không
+    const pageFavRows    = pageRows.filter(r => favorites.has(r.symbol));
+    const pageNormalRows = pageRows.filter(r => !favorites.has(r.symbol));
+
+    if (pageFavRows.length > 0) {
+      // Chỉ render divider WATCHLIST nếu trang đầu hoặc page bắt đầu từ vùng fav
+      if (start < favRows.length) {
+        html += renderDivider('★ WATCHLIST', favRows.length);
+      }
+      html += pageFavRows.map((r, i) => renderRow(r, start + i + 1)).join('');
     }
 
-    if (normalRows.length > 0) {
-      html += renderDivider('ALL PAIRS', normalRows.length);
-      html += normalRows.map((r, i) => renderRow(r, i + 1)).join('');
+    if (pageNormalRows.length > 0) {
+      // Chỉ render divider ALL PAIRS nếu đây là đầu vùng normal trên trang này
+      const normalStart = start - favRows.length;
+      if (normalStart <= 0 || pageFavRows.length > 0) {
+        html += renderDivider('ALL PAIRS', normalRows.length);
+      }
+      const normalRankStart = favRows.length + Math.max(0, normalStart);
+      html += pageNormalRows.map((r, i) => renderRow(r, normalRankStart + i + 1)).join('');
     }
 
     tbody.innerHTML = html;
   } else {
-    tbody.innerHTML = rows.map((r, i) => renderRow(r, i + 1)).join('');
+    const pageRows = rows.slice(start, end);
+    tbody.innerHTML = pageRows.map((r, i) => renderRow(r, start + i + 1)).join('');
   }
 
+  renderPagination(totalPages);
   hideState();
+}
+
+// ══════════════════════════════════════════════════════════════
+// PAGINATION
+// ══════════════════════════════════════════════════════════════
+
+function renderPagination(totalPages) {
+  const el = document.getElementById('pagination');
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+
+  const maxVisible = 7; // số nút trang hiện tối đa
+  let pages = [];
+
+  if (totalPages <= maxVisible) {
+    pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  } else {
+    // Luôn hiện trang 1, trang cuối, và vùng xung quanh currentPage
+    const left  = Math.max(2, currentPage - 2);
+    const right = Math.min(totalPages - 1, currentPage + 2);
+
+    pages.push(1);
+    if (left > 2) pages.push('…');
+    for (let p = left; p <= right; p++) pages.push(p);
+    if (right < totalPages - 1) pages.push('…');
+    pages.push(totalPages);
+  }
+
+  const btn = (label, page, disabled = false, active = false) =>
+    `<button class="page-btn${active ? ' active' : ''}"
+      ${disabled ? 'disabled' : `onclick="goToPage(${page})"`}>
+      ${label}
+    </button>`;
+
+  let html = '';
+  html += btn('‹ Prev', currentPage - 1, currentPage === 1);
+  for (const p of pages) {
+    if (p === '…') {
+      html += `<span class="page-ellipsis">…</span>`;
+    } else {
+      html += btn(p, p, false, p === currentPage);
+    }
+  }
+  html += btn('Next ›', currentPage + 1, currentPage === totalPages);
+
+  // Thông tin trang
+  const start = (currentPage - 1) * PAGE_SIZE + 1;
+  const end   = Math.min(currentPage * PAGE_SIZE, totalPages * PAGE_SIZE);
+  html += `<span class="page-info">Page ${currentPage} / ${totalPages}</span>`;
+
+  el.innerHTML = html;
+}
+
+function goToPage(page) {
+  currentPage = page;
+  renderTable();
+  // Scroll lên đầu bảng
+  document.querySelector('.table-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderDivider(label, count) {
@@ -324,6 +412,7 @@ function sortBy(col) {
     sortCol = col;
     sortDir = 'desc';
   }
+  currentPage = 1;
   updateSortHeaders();
   if (allRows.length) renderTable();
 }
@@ -343,7 +432,8 @@ function updateSortHeaders() {
 }
 
 document.getElementById('search').addEventListener('input', e => {
-  searchTerm = e.target.value;
+  searchTerm  = e.target.value;
+  currentPage = 1;
   if (allRows.length) renderTable();
 });
 
