@@ -51,9 +51,6 @@ function updateFavCount() {
 
 // ══════════════════════════════════════════════════════════════
 // DATA FETCHING
-// Lấy 7 ngày gần nhất để tính được vol3d current + vol3d prev
-// Lấy 15 ngày gần nhất để tính được vol7d current + vol7d prev
-// Lấy thêm 1 ngày vì ngày hiện tại không tính
 // ══════════════════════════════════════════════════════════════
 
 async function loadData() {
@@ -62,7 +59,6 @@ async function loadData() {
   showState('loading', 'Fetching data...');
 
   try {
-    // Lấy 15 ngày để có đủ: 1 ngày hiện tại + 7 ngày curr + 7 ngày prev
     const since = new Date();
     since.setUTCDate(since.getUTCDate() - 15);
     const sinceDate = since.toISOString().split('T')[0];
@@ -81,7 +77,6 @@ async function loadData() {
 
     allRows = computeRows(data);
 
-    // Hiển thị ngày dữ liệu mới nhất
     const latestDate = allRows.length > 0
       ? data.find(d => true)?.date || '—'
       : '—';
@@ -102,27 +97,9 @@ async function loadData() {
 
 // ══════════════════════════════════════════════════════════════
 // COMPUTATION
-//
-// Với dữ liệu daily, mỗi row là 1 ngày:
-//   days[0] = ngày mới nhất (D0 = hôm trước)
-//   days[1] = D-1 (2 ngày trước), ...
-//
-// %Price 1D  = (price[D0] - price[D1]) / price[D1] * 100
-//
-// Vol 1D     = quote_volume[D0]
-// %Vol 1D    = (vol[D0] - vol[D1]) / vol[D1] * 100
-//
-// Vol 7D     = sum(D0..D6)
-// %Vol 7D    = (vol7d_curr - vol7d_prev) / vol7d_prev * 100
-//              vol7d_prev = sum(D7..D13)
-//
-// Vol 3D     = sum(D0..D2)
-// %Vol 3D    = (vol3d_curr - vol3d_prev) / vol3d_prev * 100
-//              vol3d_prev = sum(D3..D5)
 // ══════════════════════════════════════════════════════════════
 
 function computeRows(data) {
-  // Group by symbol, sort by date DESC (newest first)
   const bySymbol = {};
   for (const row of data) {
     if (!bySymbol[row.symbol]) bySymbol[row.symbol] = [];
@@ -132,7 +109,6 @@ function computeRows(data) {
   const results = [];
 
   for (const [symbol, rows] of Object.entries(bySymbol)) {
-    // rows đã sort DESC từ query
     const n = rows.length;
 
     const vol  = (i) => (i < n ? rows[i].quote_volume : null);
@@ -151,7 +127,6 @@ function computeRows(data) {
         ? (curr - prev) / prev * 100
         : null;
 
-    // Metrics
     const price      = pr(0);
     const pctPrice1d = pct(pr(0), pr(1));
 
@@ -168,6 +143,8 @@ function computeRows(data) {
     const vol7d      = vol7d_curr;
     const pctVol7d   = pct(vol7d_curr, vol7d_prev);
 
+    // ── Sparkline: lấy volume 7 ngày gần nhất, đảo ngược để cũ → mới
+    const volHistory = [vol(13), vol(12), vol(11), vol(10), vol(9), vol(8), vol(7), vol(6), vol(5), vol(4), vol(3), vol(2), vol(1), vol(0)];
 
     results.push({
       symbol,
@@ -179,6 +156,7 @@ function computeRows(data) {
       pctVol3d,
       vol7d,
       pctVol7d,
+      volHistory,
       _days: n,
     });
   }
@@ -196,12 +174,10 @@ function renderTable() {
     ? allRows.filter(r => r.symbol.includes(q))
     : [...allRows];
 
-  // Nếu đang bật watchlist-only, chỉ giữ các coin favorite
   if (favFilterOn) {
     rows = rows.filter(r => favorites.has(r.symbol));
   }
 
-  // Sort
   rows.sort((a, b) => {
     const av = a[sortCol];
     const bv = b[sortCol];
@@ -213,44 +189,34 @@ function renderTable() {
     return sortDir === 'asc' ? av - bv : bv - av;
   });
 
-  // Tách favorites lên đầu (chỉ khi không đang filter watchlist-only)
   if (!favFilterOn) {
     const favRows    = rows.filter(r => favorites.has(r.symbol));
     const normalRows = rows.filter(r => !favorites.has(r.symbol));
     rows = [...favRows, ...normalRows];
   }
 
-  // ── Pagination ────────────────────────────────────────────
   const totalRows  = rows.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
-  // Clamp trang hiện tại nếu filter làm giảm số trang
   if (currentPage > totalPages) currentPage = totalPages;
 
   const start = (currentPage - 1) * PAGE_SIZE;
   const end   = start + PAGE_SIZE;
 
-  // Rank offset: số thứ tự bắt đầu từ vị trí thực trong toàn bộ danh sách
-  const rankOffset = start;
-
   document.getElementById('showing-count').textContent = totalRows;
 
   const tbody = document.getElementById('tbody');
 
-  // Render với divider nếu có favorites và không đang filter
   if (!favFilterOn && favorites.size > 0) {
     const favRows    = rows.filter(r => favorites.has(r.symbol));
     const normalRows = rows.filter(r => !favorites.has(r.symbol));
 
-    // Tính page slice trên toàn bộ rows (bao gồm cả 2 nhóm)
     const pageRows = rows.slice(start, end);
     let html = '';
 
-    // Kiểm tra xem page này có chứa fav rows không
     const pageFavRows    = pageRows.filter(r => favorites.has(r.symbol));
     const pageNormalRows = pageRows.filter(r => !favorites.has(r.symbol));
 
     if (pageFavRows.length > 0) {
-      // Chỉ render divider WATCHLIST nếu trang đầu hoặc page bắt đầu từ vùng fav
       if (start < favRows.length) {
         html += renderDivider('★ WATCHLIST', favRows.length);
       }
@@ -258,7 +224,6 @@ function renderTable() {
     }
 
     if (pageNormalRows.length > 0) {
-      // Chỉ render divider ALL PAIRS nếu đây là đầu vùng normal trên trang này
       const normalStart = start - favRows.length;
       if (normalStart <= 0 || pageFavRows.length > 0) {
         html += renderDivider('ALL PAIRS', normalRows.length);
@@ -285,13 +250,12 @@ function renderPagination(totalPages) {
   const el = document.getElementById('pagination');
   if (totalPages <= 1) { el.innerHTML = ''; return; }
 
-  const maxVisible = 7; // số nút trang hiện tối đa
+  const maxVisible = 7;
   let pages = [];
 
   if (totalPages <= maxVisible) {
     pages = Array.from({ length: totalPages }, (_, i) => i + 1);
   } else {
-    // Luôn hiện trang 1, trang cuối, và vùng xung quanh currentPage
     const left  = Math.max(2, currentPage - 2);
     const right = Math.min(totalPages - 1, currentPage + 2);
 
@@ -319,9 +283,6 @@ function renderPagination(totalPages) {
   }
   html += btn('Next ›', currentPage + 1, currentPage === totalPages);
 
-  // Thông tin trang
-  const start = (currentPage - 1) * PAGE_SIZE + 1;
-  const end   = Math.min(currentPage * PAGE_SIZE, totalPages * PAGE_SIZE);
   html += `<span class="page-info">Page ${currentPage} / ${totalPages}</span>`;
 
   el.innerHTML = html;
@@ -330,13 +291,12 @@ function renderPagination(totalPages) {
 function goToPage(page) {
   currentPage = page;
   renderTable();
-  // Scroll lên đầu bảng
   document.querySelector('.table-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderDivider(label, count) {
   return `<tr class="section-divider">
-    <td colspan="7">
+    <td colspan="10">
       <span class="divider-label">${label}</span>
       <span class="divider-count">${count}</span>
     </td>
@@ -344,9 +304,9 @@ function renderDivider(label, count) {
 }
 
 function renderRow(r, rank) {
-  const base    = r.symbol.replace('USDT', '');
-  const isFav   = favorites.has(r.symbol);
-  const favClass = isFav ? ' fav-row' : '';
+  const base     = r.symbol.replace('USDT', '');
+  const isFav    = favorites.has(r.symbol);
+  const favClass  = isFav ? ' fav-row' : '';
   const starClass = isFav ? 'star-btn active' : 'star-btn';
   const starIcon  = isFav ? '★' : '☆';
 
@@ -367,7 +327,57 @@ function renderRow(r, rank) {
     <td>${pctCell(r.pctVol3d)}</td>
     <td class="vol-cell group-sep">${formatVol(r.vol7d)}</td>
     <td>${pctCell(r.pctVol7d)}</td>
+    <td class="group-sep" style="padding: 4px 14px; vertical-align: middle;">${sparkline(r.volHistory)}</td>
   </tr>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SPARKLINE
+// ══════════════════════════════════════════════════════════════
+
+function sparkline(history) {
+  // Lọc bỏ null, giữ nguyên index để biết vị trí
+  const vals = history.filter(v => v !== null);
+  if (vals.length < 2) return '<span class="pct-cell na">—</span>';
+
+  const W = 84, H = 28, pad = 3;
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const range = max - min || 1;
+
+  // Tính tọa độ từng điểm
+  const pts = vals.map((v, i) => {
+    const x = pad + (i / (vals.length - 1)) * (W - pad * 2);
+    const y = H - pad - ((v - min) / range) * (H - pad * 2);
+    return [parseFloat(x.toFixed(1)), parseFloat(y.toFixed(1))];
+  });
+
+  const polyPoints = pts.map(p => p.join(',')).join(' ');
+
+  // Màu: xanh nếu ngày cuối >= ngày đầu, đỏ nếu ngược lại
+  const isUp  = vals[vals.length - 1] >= vals[0];
+  const color = isUp ? '#00e676' : '#ff4757';
+  const fillColor = isUp ? '#00e67614' : '#ff475714';
+
+  // Vùng fill (area chart)
+  const areaPoints =
+    `${pts[0][0]},${H} ` +
+    polyPoints +
+    ` ${pts[pts.length - 1][0]},${H}`;
+
+  // Điểm cuối (dot)
+  const [lx, ly] = pts[pts.length - 1];
+
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">
+    <polygon points="${areaPoints}" fill="${fillColor}" />
+    <polyline points="${polyPoints}"
+      fill="none"
+      stroke="${color}"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"/>
+    <circle cx="${lx}" cy="${ly}" r="2.2" fill="${color}" />
+  </svg>`;
 }
 
 // ══════════════════════════════════════════════════════════════
