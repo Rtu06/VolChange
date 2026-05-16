@@ -130,9 +130,9 @@ async function main() {
     process.exit(1);
   }
 
-  // Xoá dữ liệu cũ hơn 30 ngày
+  // Xoá dữ liệu cũ hơn 20 ngày
   const cutoff = new Date();
-  cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+  cutoff.setUTCDate(cutoff.getUTCDate() - 20);
   const cutoffDate = cutoff.toISOString().split("T")[0];
 
   const { error: deleteErr } = await supabase
