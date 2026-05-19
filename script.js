@@ -315,7 +315,12 @@ function renderRow(r, rank) {
       <div class="symbol-cell">
         <button class="${starClass}" onclick="toggleFavorite('${r.symbol}')" title="Add to watchlist">${starIcon}</button>
         <span class="rank">${rank}</span>
-        <span class="symbol-name">${base}</span>
+        <a class="symbol-name" 
+           href="https://www.binance.com/en/trade/${base}_USDT" 
+           target="_blank" 
+           rel="noopener noreferrer" 
+           title="Trade on Binance"
+           style="color:inherit;text-decoration:none;">${base}</a>
         <span class="symbol-base">USDT</span>
       </div>
     </td>
