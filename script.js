@@ -8,11 +8,11 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 let allRows     = [];
-let sortCol     = 'vol1d';
+let sortCol     = '';
 let sortDir     = 'desc';
 let searchTerm  = '';
 let currentPage = 1;
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 80;
 
 // ══════════════════════════════════════════════════════════════
 // FAVORITES  (localStorage)
@@ -130,17 +130,14 @@ function computeRows(data) {
     const price      = pr(0);
     const pctPrice1d = pct(pr(0), pr(1));
 
-    const vol1d      = vol(0);
     const pctVol1d   = pct(vol(0), vol(1));
 
     const vol3d_curr = sumRange(0, 2);
     const vol3d_prev = sumRange(3, 5);
-    const vol3d      = vol3d_curr;
     const pctVol3d   = pct(vol3d_curr, vol3d_prev);
 
     const vol7d_curr = sumRange(0, 6);
     const vol7d_prev = sumRange(7, 13);
-    const vol7d      = vol7d_curr;
     const pctVol7d   = pct(vol7d_curr, vol7d_prev);
 
     // ── Sparkline: lấy volume 7 ngày gần nhất, đảo ngược để cũ → mới
@@ -150,11 +147,8 @@ function computeRows(data) {
       symbol,
       price,
       pctPrice1d,
-      vol1d,
       pctVol1d,
-      vol3d,
       pctVol3d,
-      vol7d,
       pctVol7d,
       volHistory,
       _days: n,
@@ -296,7 +290,7 @@ function goToPage(page) {
 
 function renderDivider(label, count) {
   return `<tr class="section-divider">
-    <td colspan="10">
+    <td colspan="7">
       <span class="divider-label">${label}</span>
       <span class="divider-count">${count}</span>
     </td>
@@ -326,12 +320,9 @@ function renderRow(r, rank) {
     </td>
     <td class="price-cell">${formatPrice(r.price)}</td>
     <td>${pctCell(r.pctPrice1d)}</td>
-    <td class="vol-cell group-sep">${formatVol(r.vol1d)}</td>
-    <td>${pctCell(r.pctVol1d)}</td>
-    <td class="vol-cell group-sep">${formatVol(r.vol3d)}</td>
-    <td>${pctCell(r.pctVol3d)}</td>
-    <td class="vol-cell group-sep">${formatVol(r.vol7d)}</td>
-    <td>${pctCell(r.pctVol7d)}</td>
+    <td class="group-sep">${pctCell(r.pctVol1d)}</td>
+    <td class="group-sep">${pctCell(r.pctVol3d)}</td>
+    <td class="group-sep">${pctCell(r.pctVol7d)}</td>
     <td class="group-sep" style="padding: 4px 14px; vertical-align: middle;">${sparkline(r.volHistory)}</td>
   </tr>`;
 }
