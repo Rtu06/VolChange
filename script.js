@@ -4,9 +4,49 @@
 const SUPABASE_URL  = 'https://tjyoynizwezgdwooagnr.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqeW95bml6d2V6Z2R3b29hZ25yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMzU5MjMsImV4cCI6MjA5MzcxMTkyM30.MVYC2MP4Z6LhohKHopC_dByo2J82FMINwvJKoCfWHY8';
 
-// ── State ──────────────────────────────────────────────────────
+// ── Supabase client ────────────────────────────────────────────
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+// ══════════════════════════════════════════════════════════════
+// TAB STATE
+// ══════════════════════════════════════════════════════════════
+let activeTab = 'binance';
+let vnLoaded  = false; // lazy: chỉ load khi user click tab
+
+function switchTab(tab) {
+  activeTab = tab;
+
+  // Toggle panels
+  document.getElementById('panel-binance').style.display  = tab === 'binance' ? '' : 'none';
+  document.getElementById('panel-vnstock').style.display  = tab === 'vnstock' ? '' : 'none';
+
+  // Toggle tab buttons
+  document.getElementById('tab-binance').classList.toggle('active', tab === 'binance');
+  document.getElementById('tab-vnstock').classList.toggle('active', tab === 'vnstock');
+
+  // Lazy load VN data on first visit
+  if (tab === 'vnstock' && !vnLoaded) {
+    loadVnData();
+  }
+
+  // Update header meta context
+  updateHeaderMeta();
+}
+
+function refreshCurrent() {
+  if (activeTab === 'binance') {
+    loadData();
+  } else {
+    vnLoaded = false;
+    loadVnData();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ════════════════════  BINANCE TAB  ═══════════════════════════
+// ══════════════════════════════════════════════════════════════
+
+// ── Binance State ──────────────────────────────────────────────
 let allRows     = [];
 let sortCol     = '';
 let sortDir     = 'desc';
@@ -14,45 +54,32 @@ let searchTerm  = '';
 let currentPage = 1;
 const PAGE_SIZE = 80;
 
-// ══════════════════════════════════════════════════════════════
-// FAVORITES  (localStorage)
-// ══════════════════════════════════════════════════════════════
+// ── Favorites ─────────────────────────────────────────────────
 const LS_KEY = 'bvt_favorites';
-let favorites    = new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]'));
-let favFilterOn  = false;
+let favorites   = new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]'));
+let favFilterOn = false;
 
 function saveFavorites() {
   localStorage.setItem(LS_KEY, JSON.stringify([...favorites]));
 }
-
 function toggleFavorite(symbol) {
-  if (favorites.has(symbol)) {
-    favorites.delete(symbol);
-  } else {
-    favorites.add(symbol);
-  }
+  favorites.has(symbol) ? favorites.delete(symbol) : favorites.add(symbol);
   saveFavorites();
   updateFavCount();
   renderTable();
 }
-
 function toggleFavFilter() {
   favFilterOn = !favFilterOn;
   currentPage = 1;
-  const btn = document.getElementById('fav-filter-btn');
-  btn.classList.toggle('active', favFilterOn);
+  document.getElementById('fav-filter-btn').classList.toggle('active', favFilterOn);
   if (allRows.length) renderTable();
 }
-
 function updateFavCount() {
   const el = document.getElementById('fav-count');
   el.textContent = favorites.size > 0 ? `(${favorites.size})` : '';
 }
 
-// ══════════════════════════════════════════════════════════════
-// DATA FETCHING
-// ══════════════════════════════════════════════════════════════
-
+// ── Data Fetching ─────────────────────────────────────────────
 async function loadData() {
   const btn = document.getElementById('refresh-btn');
   btn.disabled = true;
@@ -77,13 +104,8 @@ async function loadData() {
 
     allRows = computeRows(data);
 
-    const latestDate = allRows.length > 0
-      ? data.find(d => true)?.date || '—'
-      : '—';
-    document.getElementById('total-pairs').textContent = allRows.length;
-    document.getElementById('data-date').textContent   = latestDate;
-    document.getElementById('last-update').textContent = formatTime(new Date());
-
+    const latestDate = data[0]?.date || '—';
+    updateHeaderMetaValues(allRows.length, latestDate);
     updateFavCount();
     renderTable();
 
@@ -95,10 +117,7 @@ async function loadData() {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// COMPUTATION
-// ══════════════════════════════════════════════════════════════
-
+// ── Computation ───────────────────────────────────────────────
 function computeRows(data) {
   const bySymbol = {};
   for (const row of data) {
@@ -107,12 +126,10 @@ function computeRows(data) {
   }
 
   const results = [];
-
   for (const [symbol, rows] of Object.entries(bySymbol)) {
-    const n = rows.length;
-
-    const vol  = (i) => (i < n ? rows[i].quote_volume : null);
-    const pr   = (i) => (i < n ? rows[i].price        : null);
+    const n   = rows.length;
+    const vol = (i) => (i < n ? rows[i].quote_volume : null);
+    const pr  = (i) => (i < n ? rows[i].price        : null);
 
     const sumRange = (from, to) => {
       let s = 0, valid = 0;
@@ -124,68 +141,37 @@ function computeRows(data) {
 
     const pct = (curr, prev) =>
       curr !== null && prev !== null && prev !== 0
-        ? (curr - prev) / prev * 100
-        : null;
+        ? (curr - prev) / prev * 100 : null;
 
     const price      = pr(0);
     const pctPrice1d = pct(pr(0), pr(1));
     const pctPrice2d = pct(pr(0), pr(2));
     const pctPrice3d = pct(pr(0), pr(3));
     const pctPrice7d = pct(pr(0), pr(7));
-
     const pctVol1d   = pct(vol(0), vol(1));
+    const pctVol3d   = pct(sumRange(0,2), sumRange(3,5));
+    const pctVol7d   = pct(sumRange(0,6), sumRange(7,13));
 
-    const vol3d_curr = sumRange(0, 2);
-    const vol3d_prev = sumRange(3, 5);
-    const pctVol3d   = pct(vol3d_curr, vol3d_prev);
+    const volHistory = [13,12,11,10,9,8,7,6,5,4,3,2,1,0].map(i => vol(i));
 
-    const vol7d_curr = sumRange(0, 6);
-    const vol7d_prev = sumRange(7, 13);
-    const pctVol7d   = pct(vol7d_curr, vol7d_prev);
-
-    // ── Sparkline: lấy volume 7 ngày gần nhất, đảo ngược để cũ → mới
-    const volHistory = [vol(13), vol(12), vol(11), vol(10), vol(9), vol(8), vol(7), vol(6), vol(5), vol(4), vol(3), vol(2), vol(1), vol(0)];
-
-    results.push({
-      symbol,
-      price,
-      pctPrice1d,
-      pctPrice2d,
-      pctPrice3d,
-      pctPrice7d,
-      pctVol1d,
-      pctVol3d,
-      pctVol7d,
-      volHistory,
-      _days: n,
-    });
+    results.push({ symbol, price, pctPrice1d, pctPrice2d, pctPrice3d, pctPrice7d,
+                   pctVol1d, pctVol3d, pctVol7d, volHistory, _days: n });
   }
-
   return results;
 }
 
-// ══════════════════════════════════════════════════════════════
-// RENDERING
-// ══════════════════════════════════════════════════════════════
-
+// ── Rendering ─────────────────────────────────────────────────
 function renderTable() {
   const q  = searchTerm.toUpperCase();
-  let rows = q
-    ? allRows.filter(r => r.symbol.includes(q))
-    : [...allRows];
-
-  if (favFilterOn) {
-    rows = rows.filter(r => favorites.has(r.symbol));
-  }
+  let rows = q ? allRows.filter(r => r.symbol.includes(q)) : [...allRows];
+  if (favFilterOn) rows = rows.filter(r => favorites.has(r.symbol));
 
   rows.sort((a, b) => {
-    const av = a[sortCol];
-    const bv = b[sortCol];
+    const av = a[sortCol], bv = b[sortCol];
     if (av === null && bv === null) return 0;
     if (av === null) return 1;
     if (bv === null) return -1;
-    if (typeof av === 'string') return sortDir === 'asc'
-      ? av.localeCompare(bv) : bv.localeCompare(av);
+    if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
     return sortDir === 'asc' ? av - bv : bv - av;
   });
 
@@ -200,8 +186,6 @@ function renderTable() {
   if (currentPage > totalPages) currentPage = totalPages;
 
   const start = (currentPage - 1) * PAGE_SIZE;
-  const end   = start + PAGE_SIZE;
-
   document.getElementById('showing-count').textContent = totalRows;
 
   const tbody = document.getElementById('tbody');
@@ -209,56 +193,42 @@ function renderTable() {
   if (!favFilterOn && favorites.size > 0) {
     const favRows    = rows.filter(r => favorites.has(r.symbol));
     const normalRows = rows.filter(r => !favorites.has(r.symbol));
+    const pageRows   = rows.slice(start, start + PAGE_SIZE);
+    const pageFavR   = pageRows.filter(r => favorites.has(r.symbol));
+    const pageNormR  = pageRows.filter(r => !favorites.has(r.symbol));
 
-    const pageRows = rows.slice(start, end);
     let html = '';
-
-    const pageFavRows    = pageRows.filter(r => favorites.has(r.symbol));
-    const pageNormalRows = pageRows.filter(r => !favorites.has(r.symbol));
-
-    if (pageFavRows.length > 0) {
-      if (start < favRows.length) {
-        html += renderDivider('★ WATCHLIST', favRows.length);
-      }
-      html += pageFavRows.map((r, i) => renderRow(r, start + i + 1)).join('');
+    if (pageFavR.length > 0) {
+      if (start < favRows.length) html += renderDivider('★ WATCHLIST', favRows.length);
+      html += pageFavR.map((r, i) => renderRow(r, start + i + 1)).join('');
     }
-
-    if (pageNormalRows.length > 0) {
+    if (pageNormR.length > 0) {
       const normalStart = start - favRows.length;
-      if (normalStart <= 0 || pageFavRows.length > 0) {
-        html += renderDivider('ALL PAIRS', normalRows.length);
-      }
+      if (normalStart <= 0 || pageFavR.length > 0) html += renderDivider('ALL PAIRS', normalRows.length);
       const normalRankStart = favRows.length + Math.max(0, normalStart);
-      html += pageNormalRows.map((r, i) => renderRow(r, normalRankStart + i + 1)).join('');
+      html += pageNormR.map((r, i) => renderRow(r, normalRankStart + i + 1)).join('');
     }
-
     tbody.innerHTML = html;
   } else {
-    const pageRows = rows.slice(start, end);
-    tbody.innerHTML = pageRows.map((r, i) => renderRow(r, start + i + 1)).join('');
+    tbody.innerHTML = rows.slice(start, start + PAGE_SIZE)
+      .map((r, i) => renderRow(r, start + i + 1)).join('');
   }
 
   renderPagination(totalPages);
   hideState();
 }
 
-// ══════════════════════════════════════════════════════════════
-// PAGINATION
-// ══════════════════════════════════════════════════════════════
-
+// ── Pagination ────────────────────────────────────────────────
 function renderPagination(totalPages) {
   const el = document.getElementById('pagination');
   if (totalPages <= 1) { el.innerHTML = ''; return; }
 
-  const maxVisible = 7;
   let pages = [];
-
-  if (totalPages <= maxVisible) {
+  if (totalPages <= 7) {
     pages = Array.from({ length: totalPages }, (_, i) => i + 1);
   } else {
     const left  = Math.max(2, currentPage - 2);
     const right = Math.min(totalPages - 1, currentPage + 2);
-
     pages.push(1);
     if (left > 2) pages.push('…');
     for (let p = left; p <= right; p++) pages.push(p);
@@ -268,23 +238,14 @@ function renderPagination(totalPages) {
 
   const btn = (label, page, disabled = false, active = false) =>
     `<button class="page-btn${active ? ' active' : ''}"
-      ${disabled ? 'disabled' : `onclick="goToPage(${page})"`}>
-      ${label}
-    </button>`;
+      ${disabled ? 'disabled' : `onclick="goToPage(${page})"`}>${label}</button>`;
 
-  let html = '';
-  html += btn('‹ Prev', currentPage - 1, currentPage === 1);
+  let html = btn('‹ Prev', currentPage - 1, currentPage === 1);
   for (const p of pages) {
-    if (p === '…') {
-      html += `<span class="page-ellipsis">…</span>`;
-    } else {
-      html += btn(p, p, false, p === currentPage);
-    }
+    html += p === '…' ? `<span class="page-ellipsis">…</span>` : btn(p, p, false, p === currentPage);
   }
   html += btn('Next ›', currentPage + 1, currentPage === totalPages);
-
   html += `<span class="page-info">Page ${currentPage} / ${totalPages}</span>`;
-
   el.innerHTML = html;
 }
 
@@ -295,17 +256,15 @@ function goToPage(page) {
 }
 
 function renderDivider(label, count) {
-  return `<tr class="section-divider">
-    <td colspan="10">
-      <span class="divider-label">${label}</span>
-      <span class="divider-count">${count}</span>
-    </td>
-  </tr>`;
+  return `<tr class="section-divider"><td colspan="10">
+    <span class="divider-label">${label}</span>
+    <span class="divider-count">${count}</span>
+  </td></tr>`;
 }
 
 function renderRow(r, rank) {
-  const base     = r.symbol.replace('USDT', '');
-  const isFav    = favorites.has(r.symbol);
+  const base      = r.symbol.replace('USDT', '');
+  const isFav     = favorites.has(r.symbol);
   const favClass  = isFav ? ' fav-row' : '';
   const starClass = isFav ? 'star-btn active' : 'star-btn';
   const starIcon  = isFav ? '★' : '☆';
@@ -315,12 +274,8 @@ function renderRow(r, rank) {
       <div class="symbol-cell">
         <button class="${starClass}" onclick="toggleFavorite('${r.symbol}')" title="Add to watchlist">${starIcon}</button>
         <span class="rank">${rank}</span>
-        <a class="symbol-name" 
-           href="https://www.binance.com/en/trade/${base}_USDT" 
-           target="_blank" 
-           rel="noopener noreferrer" 
-           title="Trade on Binance"
-           style="color:inherit;text-decoration:none;">${base}</a>
+        <a class="symbol-name" href="https://www.binance.com/en/trade/${base}_USDT"
+           target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;">${base}</a>
         <span class="symbol-base">USDT</span>
       </div>
     </td>
@@ -332,100 +287,40 @@ function renderRow(r, rank) {
     <td class="group-sep">${pctCell(r.pctVol1d)}</td>
     <td class="group-sep">${pctCell(r.pctVol3d)}</td>
     <td class="group-sep">${pctCell(r.pctVol7d)}</td>
-    <td class="group-sep" style="padding: 4px 14px; vertical-align: middle;">${sparkline(r.volHistory)}</td>
+    <td class="group-sep" style="padding:4px 14px;vertical-align:middle;">${sparkline(r.volHistory)}</td>
   </tr>`;
 }
 
-// ══════════════════════════════════════════════════════════════
-// SPARKLINE
-// ══════════════════════════════════════════════════════════════
-
+// ── Sparkline ─────────────────────────────────────────────────
 function sparkline(history) {
-  // Lọc bỏ null, giữ nguyên index để biết vị trí
   const vals = history.filter(v => v !== null);
   if (vals.length < 2) return '<span class="pct-cell na">—</span>';
-
   const W = 84, H = 28, pad = 3;
-  const min = Math.min(...vals);
-  const max = Math.max(...vals);
+  const min = Math.min(...vals), max = Math.max(...vals);
   const range = max - min || 1;
-
-  // Tính tọa độ từng điểm
-  const pts = vals.map((v, i) => {
-    const x = pad + (i / (vals.length - 1)) * (W - pad * 2);
-    const y = H - pad - ((v - min) / range) * (H - pad * 2);
-    return [parseFloat(x.toFixed(1)), parseFloat(y.toFixed(1))];
-  });
-
-  const polyPoints = pts.map(p => p.join(',')).join(' ');
-
-  // Màu: xanh nếu ngày cuối >= ngày đầu, đỏ nếu ngược lại
+  const pts   = vals.map((v, i) => [
+    parseFloat((pad + (i / (vals.length - 1)) * (W - pad * 2)).toFixed(1)),
+    parseFloat((H - pad - ((v - min) / range) * (H - pad * 2)).toFixed(1))
+  ]);
+  const poly  = pts.map(p => p.join(',')).join(' ');
   const isUp  = vals[vals.length - 1] >= vals[0];
   const color = isUp ? '#00e676' : '#ff4757';
-  const fillColor = isUp ? '#00e67614' : '#ff475714';
-
-  // Vùng fill (area chart)
-  const areaPoints =
-    `${pts[0][0]},${H} ` +
-    polyPoints +
-    ` ${pts[pts.length - 1][0]},${H}`;
-
-  // Điểm cuối (dot)
+  const fill  = isUp ? '#00e67614' : '#ff475714';
+  const area  = `${pts[0][0]},${H} ${poly} ${pts[pts.length-1][0]},${H}`;
   const [lx, ly] = pts[pts.length - 1];
-
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">
-    <polygon points="${areaPoints}" fill="${fillColor}" />
-    <polyline points="${polyPoints}"
-      fill="none"
-      stroke="${color}"
-      stroke-width="1.5"
-      stroke-linecap="round"
-      stroke-linejoin="round"/>
+    <polygon points="${area}" fill="${fill}" />
+    <polyline points="${poly}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="${lx}" cy="${ly}" r="2.2" fill="${color}" />
   </svg>`;
 }
 
-// ══════════════════════════════════════════════════════════════
-// FORMATTERS
-// ══════════════════════════════════════════════════════════════
-
-function formatPrice(p) {
-  if (p === null) return '<span class="na">—</span>';
-  if (p >= 1000)  return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  if (p >= 1)     return '$' + p.toFixed(4);
-  if (p >= 0.001) return '$' + p.toFixed(6);
-  return '$' + p.toExponential(4);
-}
-
-function formatVol(v) {
-  if (v === null) return '<span class="na">—</span>';
-  if (v >= 1e9) return `$${(v/1e9).toFixed(2)}<span class="unit">B</span>`;
-  if (v >= 1e6) return `$${(v/1e6).toFixed(2)}<span class="unit">M</span>`;
-  if (v >= 1e3) return `$${(v/1e3).toFixed(1)}<span class="unit">K</span>`;
-  return '$' + v.toFixed(0);
-}
-
-function pctCell(v) {
-  if (v === null) return '<span class="pct-cell na">N/A</span>';
-  const cls  = v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu';
-  const sign = v > 0 ? '+' : '';
-  return `<span class="pct-cell ${cls}">${sign}${v.toFixed(2)}%</span>`;
-}
-
-function formatTime(d) {
-  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
-// ══════════════════════════════════════════════════════════════
-// SORT & FILTER
-// ══════════════════════════════════════════════════════════════
-
+// ── Sort & Filter ─────────────────────────────────────────────
 function sortBy(col) {
   if (sortCol === col) {
     sortDir = sortDir === 'desc' ? 'asc' : 'desc';
   } else {
-    sortCol = col;
-    sortDir = 'desc';
+    sortCol = col; sortDir = 'desc';
   }
   currentPage = 1;
   updateSortHeaders();
@@ -447,20 +342,15 @@ function updateSortHeaders() {
 }
 
 document.getElementById('search').addEventListener('input', e => {
-  searchTerm  = e.target.value;
-  currentPage = 1;
+  searchTerm = e.target.value; currentPage = 1;
   if (allRows.length) renderTable();
 });
 
-// ══════════════════════════════════════════════════════════════
-// UI STATE
-// ══════════════════════════════════════════════════════════════
-
+// ── UI State ──────────────────────────────────────────────────
 function showState(type, msg) {
+  document.getElementById('state-container').style.display = 'flex';
+  document.getElementById('main-table').style.display      = 'none';
   const el = document.getElementById('state-container');
-  document.getElementById('main-table').style.display = 'none';
-  el.style.display = 'flex';
-
   if (type === 'loading') {
     el.innerHTML = `<div class="spinner"></div><span>${msg}</span>`;
   } else if (type === 'error') {
@@ -472,7 +362,348 @@ function showState(type, msg) {
 
 function hideState() {
   document.getElementById('state-container').style.display = 'none';
-  document.getElementById('main-table').style.display = 'table';
+  document.getElementById('main-table').style.display      = 'table';
+}
+
+// ══════════════════════════════════════════════════════════════
+// ═════════════════════  VN STOCK TAB  ═════════════════════════
+// ══════════════════════════════════════════════════════════════
+
+let vnAllRows    = [];    // flat array of processed symbols
+let vnSearchTerm = '';
+let vnSortCol    = 'pctVol1d';
+let vnSortDir    = 'desc';
+// Collapse state per sector (true = collapsed)
+const vnCollapsed = {};
+
+// ── Load VN data ──────────────────────────────────────────────
+async function loadVnData() {
+  vnLoaded = true;
+  showVnState('loading', 'Loading VN Stock data...');
+
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - 10); // lấy 10 ngày để tính %Vol 5D
+    const sinceDate = since.toISOString().split('T')[0];
+
+    const { data, error } = await sb
+      .from('vn_market_data')
+      .select('symbol, sector, date, close, volume, value')
+      .gte('date', sinceDate)
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      showVnState('empty', 'No VN Stock data. Collector may not have run yet.');
+      return;
+    }
+
+    vnAllRows = computeVnRows(data);
+
+    const latestDate = data[0]?.date || '—';
+    updateHeaderMetaValues(vnAllRows.length, latestDate);
+
+    renderVnTable();
+    hideVnState();
+
+  } catch (err) {
+    console.error(err);
+    showVnState('error', `Error: ${err.message}`);
+  }
+}
+
+// ── VN Computation ────────────────────────────────────────────
+function computeVnRows(data) {
+  const bySymbol = {};
+  for (const row of data) {
+    if (!bySymbol[row.symbol]) bySymbol[row.symbol] = { sector: row.sector, rows: [] };
+    bySymbol[row.symbol].rows.push(row);
+  }
+
+  const results = [];
+  for (const [symbol, { sector, rows }] of Object.entries(bySymbol)) {
+    rows.sort((a, b) => b.date.localeCompare(a.date)); // newest first
+    const n = rows.length;
+
+    const vol = (i) => (i < n ? (rows[i].value || 0) : null); // dùng value (VND) cho %Vol
+
+    const pct = (curr, prev) =>
+      curr !== null && prev !== null && prev !== 0
+        ? (curr - prev) / prev * 100 : null;
+
+    // %Vol 1D: hôm nay vs hôm qua
+    const pctVol1d = pct(vol(0), vol(1));
+
+    // %Vol 5D: tổng 5 ngày gần nhất vs 5 ngày trước đó
+    const sum5curr = sumVnRange(rows, 0, 4);
+    const sum5prev = sumVnRange(rows, 5, 9);
+    const pctVol5d = pct(sum5curr, sum5prev);
+
+    const price   = rows[0]?.close || null;
+    const todayVol = rows[0]?.value || null;
+
+    // Sparkline 5 ngày: cũ → mới
+    const volSpark = [4, 3, 2, 1, 0].map(i => (i < n ? (rows[i].value || 0) : null));
+
+    results.push({ symbol, sector, price, pctVol1d, pctVol5d, todayVol, volSpark });
+  }
+
+  return results;
+}
+
+function sumVnRange(rows, from, to) {
+  let s = 0, valid = 0;
+  for (let i = from; i <= to; i++) {
+    if (i < rows.length && rows[i].value !== null) { s += rows[i].value; valid++; }
+  }
+  return valid > 0 ? s : null;
+}
+
+// ── VN Rendering ──────────────────────────────────────────────
+function renderVnTable() {
+  const q       = vnSearchTerm.toUpperCase();
+  let rows      = q ? vnAllRows.filter(r => r.symbol.includes(q)) : [...vnAllRows];
+
+  // Sort within each sector
+  rows.sort((a, b) => {
+    const av = a[vnSortCol], bv = b[vnSortCol];
+    if (av === null && bv === null) return 0;
+    if (av === null) return 1;
+    if (bv === null) return -1;
+    return vnSortDir === 'desc' ? bv - av : av - bv;
+  });
+
+  // Group by sector (preserve original sector order)
+  const sectorOrder = [
+    'Ngân hàng', 'Bất động sản', 'Chứng khoán', 'Công nghệ',
+    'Năng lượng', 'Thép & Vật liệu', 'Tiêu dùng', 'Thực phẩm',
+    'Logistics', 'Hàng không', 'Điện & Tiện ích', 'Dược phẩm'
+  ];
+  const bySetor = {};
+  for (const r of rows) {
+    if (!bySetor[r.sector]) bySetor[r.sector] = [];
+    bySetor[r.sector].push(r);
+  }
+
+  // Build ordered sector list
+  const sectors = [];
+  for (const s of sectorOrder) {
+    if (bySetor[s]) sectors.push([s, bySetor[s]]);
+  }
+  // Append any unlisted sectors
+  for (const [s, rs] of Object.entries(bySetor)) {
+    if (!sectorOrder.includes(s)) sectors.push([s, rs]);
+  }
+
+  document.getElementById('vn-showing-count').textContent = rows.length;
+
+  const container = document.getElementById('vn-sectors-container');
+  container.innerHTML = sectors.map(([sector, srows]) =>
+    renderVnSector(sector, srows)
+  ).join('');
+
+  // Re-attach event for search filter in vn tab
+  // (already attached once below)
+}
+
+function renderVnSector(sector, rows) {
+  const isCollapsed = vnCollapsed[sector] || false;
+
+  // Compute sector averages for header display
+  const avg1d = avgValid(rows.map(r => r.pctVol1d));
+  const avg5d = avgValid(rows.map(r => r.pctVol5d));
+
+  const bodyHeight = rows.length * 36 + 33; // 33px thead
+
+  return `
+  <div class="vn-sector-block${isCollapsed ? ' collapsed' : ''}" id="sector-${safeid(sector)}">
+    <div class="vn-sector-header" onclick="toggleSector('${escAttr(sector)}')">
+      <span class="vn-sector-chevron">▾</span>
+      <span class="vn-sector-name">${sector}</span>
+      <span class="vn-sector-count">${rows.length} mã</span>
+      <div class="vn-sector-avg">
+        <div class="vn-avg-chip">1D avg: <span class="${avg1d !== null ? (avg1d > 0 ? 'pct-cell pos' : avg1d < 0 ? 'pct-cell neg' : 'pct-cell neu') : 'pct-cell na'}">${avg1d !== null ? (avg1d > 0 ? '+' : '') + avg1d.toFixed(1) + '%' : 'N/A'}</span></div>
+        <div class="vn-avg-chip">5D avg: <span class="${avg5d !== null ? (avg5d > 0 ? 'pct-cell pos' : avg5d < 0 ? 'pct-cell neg' : 'pct-cell neu') : 'pct-cell na'}">${avg5d !== null ? (avg5d > 0 ? '+' : '') + avg5d.toFixed(1) + '%' : 'N/A'}</span></div>
+      </div>
+    </div>
+    <div class="vn-sector-body" style="max-height:${isCollapsed ? 0 : bodyHeight}px">
+      <table class="vn-table">
+        <thead>
+          <tr>
+            <th onclick="sortVnBy('symbol')"   data-vncol="symbol"   ># SYMBOL <span class="sort-arrow">${vnSortCol==='symbol' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
+            <th onclick="sortVnBy('price')"    data-vncol="price"    >GIÁ <span class="sort-arrow">${vnSortCol==='price' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
+            <th onclick="sortVnBy('pctVol1d')" data-vncol="pctVol1d" class="${vnSortCol==='pctVol1d'?'active':''}">%VOL 1D <span class="sort-arrow">${vnSortCol==='pctVol1d' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
+            <th onclick="sortVnBy('pctVol5d')" data-vncol="pctVol5d" class="${vnSortCol==='pctVol5d'?'active':''}">%VOL 5D <span class="sort-arrow">${vnSortCol==='pctVol5d' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
+            <th>GT KHỚP HÔM NAY</th>
+            <th>TREND 5D</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r, i) => renderVnRow(r, i + 1)).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderVnRow(r, rank) {
+  const rowClass = r.pctVol1d !== null
+    ? (r.pctVol1d > 50 ? ' vn-top-gainer' : r.pctVol1d < -50 ? ' vn-top-loser' : '')
+    : '';
+
+  return `<tr class="${rowClass}">
+    <td>
+      <div class="vn-symbol-cell">
+        <span class="rank">${rank}</span>
+        <a class="vn-symbol-name"
+           href="https://finance.vietstock.vn/${r.symbol}/overview.htm"
+           target="_blank" rel="noopener noreferrer">${r.symbol}</a>
+      </div>
+    </td>
+    <td class="vn-price-cell">${r.price !== null ? formatVnPrice(r.price) : '—'}</td>
+    <td>${pctCell(r.pctVol1d)}</td>
+    <td>${pctCell(r.pctVol5d)}</td>
+    <td class="vn-vol-cell">${formatVnValue(r.todayVol)}</td>
+    <td style="padding:4px 14px;vertical-align:middle;">${sparklineSmall(r.volSpark)}</td>
+  </tr>`;
+}
+
+function toggleSector(sector) {
+  vnCollapsed[sector] = !vnCollapsed[sector];
+  const block = document.getElementById('sector-' + safeid(sector));
+  if (!block) return;
+  const body = block.querySelector('.vn-sector-body');
+  const rows = block.querySelectorAll('.vn-table tbody tr').length;
+  const bodyH = rows * 36 + 33;
+
+  block.classList.toggle('collapsed', vnCollapsed[sector]);
+  body.style.maxHeight = vnCollapsed[sector] ? '0' : bodyH + 'px';
+}
+
+function sortVnBy(col) {
+  if (vnSortCol === col) {
+    vnSortDir = vnSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    vnSortCol = col;
+    vnSortDir = 'desc';
+  }
+  renderVnTable();
+}
+
+// ── VN sparkline (5 bars) ─────────────────────────────────────
+function sparklineSmall(history) {
+  const vals = history.filter(v => v !== null && v > 0);
+  if (vals.length < 2) return '<span class="pct-cell na">—</span>';
+  const W = 60, H = 24, pad = 2;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const pts   = vals.map((v, i) => [
+    parseFloat((pad + (i / (vals.length - 1)) * (W - pad * 2)).toFixed(1)),
+    parseFloat((H - pad - ((v - min) / range) * (H - pad * 2)).toFixed(1))
+  ]);
+  const poly  = pts.map(p => p.join(',')).join(' ');
+  const isUp  = vals[vals.length - 1] >= vals[0];
+  const color = isUp ? '#00e676' : '#ff4757';
+  const fill  = isUp ? '#00e67614' : '#ff475714';
+  const area  = `${pts[0][0]},${H} ${poly} ${pts[pts.length-1][0]},${H}`;
+  const [lx, ly] = pts[pts.length - 1];
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">
+    <polygon points="${area}" fill="${fill}" />
+    <polyline points="${poly}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lx}" cy="${ly}" r="2" fill="${color}" />
+  </svg>`;
+}
+
+// ── VN state overlay ──────────────────────────────────────────
+function showVnState(type, msg) {
+  const el = document.getElementById('vn-state-container');
+  const ct = document.getElementById('vn-sectors-container');
+  el.style.display = 'flex';
+  ct.style.display = 'none';
+  if (type === 'loading') {
+    el.innerHTML = `<div class="spinner"></div><span>${msg}</span>`;
+  } else if (type === 'error') {
+    el.innerHTML = `<span class="error-icon">⚠</span><span style="color:var(--red)">${msg}</span>`;
+  } else {
+    el.innerHTML = `<span class="error-icon">○</span><span>${msg}</span>`;
+  }
+}
+function hideVnState() {
+  document.getElementById('vn-state-container').style.display  = 'none';
+  document.getElementById('vn-sectors-container').style.display = '';
+}
+
+// VN search input
+document.getElementById('vn-search').addEventListener('input', e => {
+  vnSearchTerm = e.target.value;
+  if (vnAllRows.length) renderVnTable();
+});
+
+// ══════════════════════════════════════════════════════════════
+// HEADER META HELPERS
+// ══════════════════════════════════════════════════════════════
+function updateHeaderMetaValues(count, date) {
+  document.getElementById('total-pairs').textContent = count;
+  document.getElementById('data-date').textContent   = date;
+  document.getElementById('last-update').textContent = formatTime(new Date());
+}
+
+function updateHeaderMeta() {
+  if (activeTab === 'binance' && allRows.length > 0) {
+    document.getElementById('total-pairs').textContent = allRows.length;
+  } else if (activeTab === 'vnstock' && vnAllRows.length > 0) {
+    document.getElementById('total-pairs').textContent = vnAllRows.length;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// FORMATTERS
+// ══════════════════════════════════════════════════════════════
+function formatPrice(p) {
+  if (p === null) return '<span class="na">—</span>';
+  if (p >= 1000)  return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (p >= 1)     return '$' + p.toFixed(4);
+  if (p >= 0.001) return '$' + p.toFixed(6);
+  return '$' + p.toExponential(4);
+}
+
+function formatVnPrice(p) {
+  if (p === null || p === 0) return '—';
+  // VN giá tính theo VND (đơn vị nghìn đồng từ TCBS)
+  return p.toLocaleString('vi-VN') + ' đ';
+}
+
+function formatVnValue(v) {
+  if (v === null || v === 0) return '<span class="pct-cell na">—</span>';
+  if (v >= 1e12) return `<span>${(v/1e12).toFixed(2)}<span style="color:var(--muted);font-size:10px"> nghìn tỷ</span></span>`;
+  if (v >= 1e9)  return `<span>${(v/1e9).toFixed(1)}<span style="color:var(--muted);font-size:10px"> tỷ</span></span>`;
+  if (v >= 1e6)  return `<span>${(v/1e6).toFixed(1)}<span style="color:var(--muted);font-size:10px"> tr</span></span>`;
+  return v.toLocaleString('vi-VN');
+}
+
+function pctCell(v) {
+  if (v === null) return '<span class="pct-cell na">N/A</span>';
+  const cls  = v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu';
+  const sign = v > 0 ? '+' : '';
+  return `<span class="pct-cell ${cls}">${sign}${v.toFixed(2)}%</span>`;
+}
+
+function formatTime(d) {
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function avgValid(arr) {
+  const valid = arr.filter(v => v !== null);
+  return valid.length > 0 ? valid.reduce((s, v) => s + v, 0) / valid.length : null;
+}
+
+function safeid(str) {
+  return str.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+function escAttr(str) {
+  return str.replace(/'/g, "\\'");
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Binance Daily Volume Tracker</title>
+<title>Volume Tracker — Binance & VN Stock</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css">
@@ -15,11 +15,11 @@
 <header>
   <div class="logo">
     <div class="logo-dot"></div>
-    BINANCE VOLUME TRACKER
+    VOLUME TRACKER
     <div class="tooltip-container">
       <div class="question-circle">?</div>
       <div class="tooltip-box">
-        Track changes in trading volume to determine which token is receiving capital inflows.
+        Track changes in trading volume to determine which token/stock is receiving capital inflows.
       </div>
     </div>
   </div>  
@@ -28,50 +28,87 @@
     <div class="stat-chip">PAIRS <span id="total-pairs">—</span></div>
     <div class="stat-chip">DATE <span id="data-date">—</span></div>
     <div class="stat-chip">LOADED <span id="last-update">—</span></div>
-    <button class="refresh-btn" id="refresh-btn" onclick="loadData()">⟳ REFRESH</button>
+    <button class="refresh-btn" id="refresh-btn" onclick="refreshCurrent()">⟳ REFRESH</button>
   </div>
 </header>
 
-<!-- ── Controls ─────────────────────────────────────────────── -->
-<div class="controls">
-  <div class="search-wrap">
-    <span class="search-icon">⌕</span>
-    <input class="search-input" id="search" type="text" placeholder="Search symbol... e.g. BTC" />
-  </div>
-  <!-- ── Favorite filter button ── -->
-  <button class="fav-filter-btn" id="fav-filter-btn" onclick="toggleFavFilter()">
-    ★ WATCHLIST <span id="fav-count"></span>
+<!-- ── Tab Bar ───────────────────────────────────────────────── -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-binance" onclick="switchTab('binance')">
+    <span class="tab-icon">◈</span> BINANCE
   </button>
-  <span class="count-badge">Showing <b id="showing-count">0</b> pairs</span>
+  <button class="tab-btn" id="tab-vnstock" onclick="switchTab('vnstock')">
+    <span class="tab-icon">◈</span> VN STOCK
+  </button>
 </div>
 
-<!-- ── Table ────────────────────────────────────────────────── -->
-<div class="table-wrap">
-  <div id="state-container" class="state-overlay">
-    <div class="spinner"></div>
-    <span>Connecting to Supabase...</span>
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TAB: BINANCE                                              -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="panel-binance">
+  <!-- ── Controls ─────────────────────────────────────────────── -->
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input class="search-input" id="search" type="text" placeholder="Search symbol... e.g. BTC" />
+    </div>
+    <button class="fav-filter-btn" id="fav-filter-btn" onclick="toggleFavFilter()">
+      ★ WATCHLIST <span id="fav-count"></span>
+    </button>
+    <span class="count-badge">Showing <b id="showing-count">0</b> pairs</span>
   </div>
-  <table id="main-table" style="display:none">
-    <thead>
-      <tr>
-        <th onclick="sortBy('symbol')"       data-col="symbol"      >#  SYMBOL <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('price')"        data-col="price"       >PRICE <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctPrice1d')"   data-col="pctPrice1d"  >%PRICE 1D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctPrice2d')"   data-col="pctPrice2d"  >%PRICE 2D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctPrice3d')"   data-col="pctPrice3d"  >%PRICE 3D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctPrice7d')"   data-col="pctPrice7d"  >%PRICE 7D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctVol1d')"     data-col="pctVol1d"  class="group-sep">%VOL 1D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctVol3d')"     data-col="pctVol3d"  class="group-sep">%VOL 3D <span class="sort-arrow">↕</span></th>
-        <th onclick="sortBy('pctVol7d')"     data-col="pctVol7d"  class="group-sep">%VOL 7D <span class="sort-arrow">↕</span></th>
-        <th data-col="chart7d" class="group-sep">VOL CHART 14D </th>
-      </tr>
-    </thead>
-    <tbody id="tbody"></tbody>
-  </table>
+
+  <!-- ── Table ────────────────────────────────────────────────── -->
+  <div class="table-wrap">
+    <div id="state-container" class="state-overlay">
+      <div class="spinner"></div>
+      <span>Connecting to Supabase...</span>
+    </div>
+    <table id="main-table" style="display:none">
+      <thead>
+        <tr>
+          <th onclick="sortBy('symbol')"       data-col="symbol"      >#  SYMBOL <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('price')"        data-col="price"       >PRICE <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('pctPrice1d')"   data-col="pctPrice1d"  >%PRICE 1D <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('pctPrice2d')"   data-col="pctPrice2d"  >%PRICE 2D <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('pctPrice3d')"   data-col="pctPrice3d"  >%PRICE 3D <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('pctPrice7d')"   data-col="pctPrice7d"  >%PRICE 7D <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('pctVol1d')"     data-col="pctVol1d"  class="group-sep">%VOL 1D <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('pctVol3d')"     data-col="pctVol3d"  class="group-sep">%VOL 3D <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('pctVol7d')"     data-col="pctVol7d"  class="group-sep">%VOL 7D <span class="sort-arrow">↕</span></th>
+          <th data-col="chart7d" class="group-sep">VOL CHART 14D </th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- ── Pagination ───────────────────────────────────────────── -->
+  <div id="pagination" class="pagination"></div>
 </div>
 
-<!-- ── Pagination ───────────────────────────────────────────── -->
-<div id="pagination" class="pagination"></div>
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TAB: VN STOCK                                            -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="panel-vnstock" style="display:none">
+  <!-- ── Controls VN ──────────────────────────────────────────── -->
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input class="search-input" id="vn-search" type="text" placeholder="Search symbol... e.g. VCB" />
+    </div>
+    <span class="count-badge">Showing <b id="vn-showing-count">0</b> mã</span>
+  </div>
+
+  <!-- ── VN Table ──────────────────────────────────────────────── -->
+  <div class="table-wrap">
+    <div id="vn-state-container" class="state-overlay" style="display:none">
+      <div class="spinner"></div>
+      <span>Loading VN Stock data...</span>
+    </div>
+    <div id="vn-sectors-container"></div>
+  </div>
+</div>
 
 <!-- ── Scripts ──────────────────────────────────────────────── -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
