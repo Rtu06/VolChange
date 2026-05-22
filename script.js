@@ -131,6 +131,7 @@ function computeRows(data) {
     const pctPrice1d = pct(pr(0), pr(1));
     const pctPrice2d = pct(pr(0), pr(2));
     const pctPrice3d = pct(pr(0), pr(3));
+    const pctPrice7d = pct(pr(0), pr(7));
 
     const pctVol1d   = pct(vol(0), vol(1));
 
@@ -151,6 +152,7 @@ function computeRows(data) {
       pctPrice1d,
       pctPrice2d,
       pctPrice3d,
+      pctPrice7d,
       pctVol1d,
       pctVol3d,
       pctVol7d,
@@ -326,6 +328,7 @@ function renderRow(r, rank) {
     <td>${pctCell(r.pctPrice1d)}</td>
     <td>${pctCell(r.pctPrice2d)}</td>
     <td>${pctCell(r.pctPrice3d)}</td>
+    <td>${pctCell(r.pctPrice7d)}</td>
     <td class="group-sep">${pctCell(r.pctVol1d)}</td>
     <td class="group-sep">${pctCell(r.pctVol3d)}</td>
     <td class="group-sep">${pctCell(r.pctVol7d)}</td>
