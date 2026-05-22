@@ -296,7 +296,7 @@ function goToPage(page) {
 
 function renderDivider(label, count) {
   return `<tr class="section-divider">
-    <td colspan="9">
+    <td colspan="10">
       <span class="divider-label">${label}</span>
       <span class="divider-count">${count}</span>
     </td>
