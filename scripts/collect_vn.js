@@ -119,47 +119,45 @@ const VN_SYMBOLS = [
   { symbol: "DMC",  sector: "Dược phẩm" },
 ];
 
-// ══════════════════════════════════════════════════════════════
-// TCBS API
-// ══════════════════════════════════════════════════════════════
-const TCBS_BASE = "https://apipubaws.tcbs.com.vn/stock-insight/v1/stock";
+// ═══════════════════════════════════
+// KBS API (thay TCBS)
+// ═══════════════════════════════════
+const KBS_BASE = "https://kbbuddywts.kbsec.com.vn/sas/stocks";
 
 const HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-  "Accept": "application/json",
-  "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
-  "Origin": "https://tcinvest.tcbs.com.vn",
-  "Referer": "https://tcinvest.tcbs.com.vn/",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  Accept: "application/json",
+  "Accept-Language": "vi-VN,vi;q=0.9",
 };
 
-/**
- * Lấy lịch sử giá ngày của 1 mã từ TCBS
- * @param {string} symbol - Mã CK, ví dụ "VCB"
- * @param {number} countBack - Số phiên lấy về
- * @returns {Array} mảng { date, open, high, low, close, volume }
- */
-async function fetchHistory(symbol, countBack = 15) {
-  const to   = Math.floor(Date.now() / 1000);
-  const from = to - countBack * 2 * 86400; // lấy dư để đủ countBack phiên
-  const url  = `${TCBS_BASE}/bars-long-term?ticker=${symbol}&type=stock&resolution=D&from=${from}&to=${to}`;
+async function fetchHistory(symbol) {
+  const url = `${KBS_BASE}/${symbol}/data_day`;
+  const res = await axios.get(url, { headers: HEADERS, timeout: 15000 });
 
-  const res = await axios.get(url, {
-    headers: HEADERS,
-    timeout: 15000,
-  });
+  const raw = res.data?.data_day || res.data?.data || [];
+  if (!Array.isArray(raw) || raw.length === 0) return [];
 
-  const raw = res.data?.data || [];
-  return raw.map((d) => ({
-    date:   d.tradingDate?.split("T")[0] || d.date || String(d.t ? new Date(d.t * 1000).toISOString().split("T")[0] : ""),
-    close:  d.close,
-    volume: d.volume,  // volume cổ phiếu (đơn vị: cổ)
-    value:  (d.close || 0) * (d.volume || 0), // giá trị khớp ước tính (VND)
-  })).filter(d => d.date).sort((a, b) => b.date.localeCompare(a.date));
+  return raw
+    .map((d) => {
+      let date = "";
+      if (typeof d.t === "string") date = d.t.split("T")[0];
+      else if (typeof d.t === "number")
+        date = new Date(d.t * 1000).toISOString().split("T")[0];
+      if (!date) return null;
+
+      // KBS trả integer, chia 1000 → nghìn đồng
+      const closeRaw = d.c ?? d.close ?? 0;
+      const vol      = d.v ?? d.volume ?? 0;
+      const close    = closeRaw / 1000;
+      const value    = close * vol;
+
+      return { date, close, volume: vol, value };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 20);
 }
 
-/**
- * Sleep helper
- */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ══════════════════════════════════════════════════════════════
