@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 from supabase import create_client
-from vnstock_data import Quote
+from vnstock import Quote
 import time
 
 # ─────────────────────────────────────────────
@@ -44,27 +44,28 @@ today     = datetime.now()
 today_str = today.strftime("%Y-%m-%d")
 
 print(f"Collecting VNStock intraday active volume — {today_str}")
+print(f"Total symbols: {len(ALL_SYMBOLS)}")
 
 # ─────────────────────────────────────────────
-# QUOTE — vnstock_data đọc VNSTOCK_API_KEY từ env tự động
+# QUOTE — dùng vnstock (free) với source KBS
+# KBS ổn định, không bị chặn IP trên cloud
 # ─────────────────────────────────────────────
-quote = Quote(source="VCI")
-
 rows = []
 
 for symbol in ALL_SYMBOLS:
     try:
         print(f"Fetching {symbol} ...", end=" ", flush=True)
 
-        df = quote.intraday(symbol=symbol, page_size=10000)
+        quote = Quote(symbol=symbol, source="KBS")
+        df = quote.intraday(page_size=10000, show_log=False)
 
         if df is None or df.empty:
             print("empty — skip")
             time.sleep(1)
             continue
 
-        # Giá vnstock_data đơn vị nghìn VND → nhân 1000 ra VND
-        df["value_vnd"] = df["price"] * df["volume"] * 1000
+        # Giá KBS đơn vị VND (không nhân 1000)
+        df["value_vnd"] = df["price"] * df["volume"]
 
         active = df[df["match_type"].isin(["Buy", "Sell"])]
 
@@ -85,7 +86,8 @@ for symbol in ALL_SYMBOLS:
     except Exception as e:
         print(f"ERROR: {e}")
 
-    time.sleep(1)  # tránh rate limit ~60 req/min
+    # KBS rate limit ~60 req/min với community key → 1s/request là đủ
+    time.sleep(1)
 
 print(f"\nCollected: {len(rows)}/{len(ALL_SYMBOLS)} symbols")
 
