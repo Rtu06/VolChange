@@ -25,11 +25,6 @@ jobs:
           VNSTOCK_API_KEY: ${{ secrets.VNSTOCK_API_KEY }}
         run: |
           python -m pip install --upgrade pip
-          
-          # 1. Tải file cấu hình các thư viện phụ thuộc từ server Vnstock
-          pip install -r https://vnstocks.com
-          
-          # 2. Chạy lệnh cài đặt bản nâng cao thông qua môi trường bảo mật
           pip install --extra-index-url https://vnstocks.com vnstock_data pandas supabase
 
 
