@@ -26,6 +26,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
 
+          # Cài requests trước — vnstock_cli.py cần nó để chạy
+          pip install requests
+
           # Tải CLI installer (dành cho server/CI — không có GUI)
           wget -q https://vnstocks.com/files/vnstock-cli-installer.run -O installer.run
           chmod +x installer.run
@@ -42,5 +45,4 @@ jobs:
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          # Chạy script bằng Python từ venv đã cài vnstock_data
           ~/.venv/bin/python scripts/collect-vnstock.py
