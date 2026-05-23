@@ -17,107 +17,95 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # DANH SÁCH CỔ PHIẾU + SECTOR
 # ─────────────────────────────────────────────
 SECTORS = {
-    "Ngân hàng": ["VCB", "BID", "CTG", "MBB", "TCB", "ACB", "STB", "VPB"],
-    "Chứng khoán": ["SSI", "VND", "HCM", "VCI", "FTS"],
-    "Bất động sản": ["VIC", "VHM", "NVL", "DXG", "PDR", "KDH"],
+    "Ngân hàng":       ["VCB", "BID", "CTG", "MBB", "TCB", "ACB", "STB", "VPB"],
+    "Chứng khoán":     ["SSI", "VND", "HCM", "VCI", "FTS"],
+    "Bất động sản":    ["VIC", "VHM", "NVL", "DXG", "PDR", "KDH"],
     "Thép & Vật liệu": ["HPG", "HSG", "NKG"],
-    "Công nghệ": ["FPT", "CMG"],
-    "Tiêu dùng": ["MWG", "DGW", "PNJ"],
-    "Thực phẩm": ["VNM", "MSN", "DBC"],
-    "Năng lượng": ["GAS", "POW", "PVD", "PVS"],
+    "Công nghệ":       ["FPT", "CMG"],
+    "Tiêu dùng":       ["MWG", "DGW", "PNJ"],
+    "Thực phẩm":       ["VNM", "MSN", "DBC"],
+    "Năng lượng":      ["GAS", "POW", "PVD", "PVS"],
     "Điện & Tiện ích": ["REE", "NT2", "PC1"],
-    "Logistics": ["GMD", "HAH", "VSC"],
-    "Hàng không": ["HVN", "VJC"]
+    "Logistics":       ["GMD", "HAH", "VSC"],
+    "Hàng không":      ["HVN", "VJC"],
 }
 
-# flatten
-ALL_SYMBOLS = []
+ALL_SYMBOLS      = []
 SYMBOL_TO_SECTOR = {}
-
 for sector, symbols in SECTORS.items():
     for s in symbols:
         ALL_SYMBOLS.append(s)
         SYMBOL_TO_SECTOR[s] = sector
 
 # ─────────────────────────────────────────────
-# DATE — chỉ upsert ngày hôm nay
+# DATE
 # ─────────────────────────────────────────────
-today      = datetime.now()
-today_str  = today.strftime("%Y-%m-%d")
+today     = datetime.now()
+today_str = today.strftime("%Y-%m-%d")
 
 print(f"Collecting VNStock intraday active volume — {today_str}")
 
-rows = []
+# ─────────────────────────────────────────────
+# QUOTE — vnstock_data đọc VNSTOCK_API_KEY từ env tự động
+# ─────────────────────────────────────────────
+quote = Quote(source="VCI")
 
-# ─────────────────────────────────────────────
-# FETCH DATA — intraday để tính tổng mua + bán chủ động
-# ─────────────────────────────────────────────
-quote = Quote(
-    source="VCI",
-    api_key=os.environ.get("VNSTOCK_API_KEY")
-)
+rows = []
 
 for symbol in ALL_SYMBOLS:
     try:
-        print("Fetching intraday:", symbol)
+        print(f"Fetching {symbol} ...", end=" ", flush=True)
 
         df = quote.intraday(symbol=symbol, page_size=10000)
 
         if df is None or df.empty:
-            print("  Empty:", symbol)
+            print("empty — skip")
             time.sleep(1)
             continue
 
-        # Tính giá trị từng lệnh (giá đơn vị nghìn VND × volume × 1000)
+        # Giá vnstock_data đơn vị nghìn VND → nhân 1000 ra VND
         df["value_vnd"] = df["price"] * df["volume"] * 1000
 
-        # Chỉ lấy lệnh mua + bán chủ động
-        active_df   = df[df["match_type"].isin(["Buy", "Sell"])]
-        active_value = active_df["value_vnd"].sum()
+        active = df[df["match_type"].isin(["Buy", "Sell"])]
 
-        # Log để debug
-        buy_val  = active_df[active_df["match_type"] == "Buy"]["value_vnd"].sum()
-        sell_val = active_df[active_df["match_type"] == "Sell"]["value_vnd"].sum()
-        print(f"  Mua={buy_val/1e9:.1f}B  Bán={sell_val/1e9:.1f}B  Total={active_value/1e9:.1f}B VND")
+        buy_val  = active[active["match_type"] == "Buy"]["value_vnd"].sum()
+        sell_val = active[active["match_type"] == "Sell"]["value_vnd"].sum()
+        total    = buy_val + sell_val
+
+        print(f"Mua={buy_val/1e9:.1f}B  Bán={sell_val/1e9:.1f}B  Total={total/1e9:.1f}B VND")
 
         rows.append({
-            "symbol":  symbol,
-            "sector":  SYMBOL_TO_SECTOR[symbol],
-            "date":    today_str,
-            "volume":  float(active_df["volume"].sum()),   # tổng KL chủ động
-            "value":   float(active_value),                # tổng GT chủ động (VND)
+            "symbol": symbol,
+            "sector": SYMBOL_TO_SECTOR[symbol],
+            "date":   today_str,
+            "volume": float(active["volume"].sum()),  # KL chủ động (cổ phiếu)
+            "value":  float(total),                   # GT chủ động (VND)
         })
 
-        time.sleep(1)  # tránh rate limit 60 req/min
-
     except Exception as e:
-        print(f"  {symbol} error:", e)
-        time.sleep(1)
+        print(f"ERROR: {e}")
 
-print(f"\nTotal symbols collected: {len(rows)}")
+    time.sleep(1)  # tránh rate limit ~60 req/min
 
-if len(rows) == 0:
-    raise Exception("No VN stock rows collected")
+print(f"\nCollected: {len(rows)}/{len(ALL_SYMBOLS)} symbols")
+
+if not rows:
+    raise SystemExit("No data collected — aborting upsert")
 
 # ─────────────────────────────────────────────
-# UPSERT — mỗi ngày 1 row per symbol
+# UPSERT — conflict key: (symbol, date)
 # ─────────────────────────────────────────────
-response = supabase.table("vn_market_data").upsert(
+supabase.table("vn_market_data").upsert(
     rows,
     on_conflict="symbol,date",
-    ignore_duplicates=False
+    ignore_duplicates=False,
 ).execute()
 
-print("Upsert done:", len(rows), "rows")
+print(f"Upsert done: {len(rows)} rows")
 
 # ─────────────────────────────────────────────
-# CLEAN OLD DATA — giữ 30 ngày để tính %VOL 5D
+# CLEANUP — giữ 30 ngày để tính %VOL 5D
 # ─────────────────────────────────────────────
 cutoff = (today - timedelta(days=30)).strftime("%Y-%m-%d")
-
-supabase.table("vn_market_data") \
-    .delete() \
-    .lt("date", cutoff) \
-    .execute()
-
-print("Cleanup done — kept data since", cutoff)
+supabase.table("vn_market_data").delete().lt("date", cutoff).execute()
+print(f"Cleanup done — data kept since {cutoff}")

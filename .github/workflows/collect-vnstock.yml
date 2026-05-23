@@ -21,20 +21,25 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
+        env:
+          VNSTOCK_API_KEY: ${{ secrets.VNSTOCK_API_KEY }}
         run: |
           python -m pip install --upgrade pip
-          
-          # 1. Cài đặt công cụ phân phối package
+
+          # 1. Cài vnstock_installer từ private index của vnstocks.com
           pip install --extra-index-url https://vnstocks.com/api/simple vnstock_installer
-          
-          # 2. Thực hiện cài đặt gói dữ liệu thông qua API Key
-          python -m vnstock_installer --api-key "${{ secrets.VNSTOCK_API_KEY }}" --packages "vnstock_data"
-          
-          # 3. Cài các thư viện bổ sung còn lại của bạn
+
+          # 2. Cài vnstock_data qua API key
+          python -m vnstock_installer \
+            --api-key "$VNSTOCK_API_KEY" \
+            --packages "vnstock_data"
+
+          # 3. Các thư viện phụ trợ
           pip install pandas supabase
 
       - name: Run VNStock collector
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VNSTOCK_API_KEY:     ${{ secrets.VNSTOCK_API_KEY }}
+          SUPABASE_URL:        ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python scripts/collect-vnstock.py
