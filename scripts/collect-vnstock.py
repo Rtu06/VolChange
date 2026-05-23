@@ -47,8 +47,7 @@ print(f"Collecting VNStock intraday active volume — {today_str}")
 print(f"Total symbols: {len(ALL_SYMBOLS)}")
 
 # ─────────────────────────────────────────────
-# QUOTE — dùng vnstock (free) với source KBS
-# KBS ổn định, không bị chặn IP trên cloud
+# FETCH
 # ─────────────────────────────────────────────
 rows = []
 
@@ -67,11 +66,16 @@ for symbol in ALL_SYMBOLS:
         # Giá KBS đơn vị VND (không nhân 1000)
         df["value_vnd"] = df["price"] * df["volume"]
 
-        active = df[df["match_type"].isin(["Buy", "Sell"])]
-
+        active   = df[df["match_type"].isin(["Buy", "Sell"])]
         buy_val  = active[active["match_type"] == "Buy"]["value_vnd"].sum()
         sell_val = active[active["match_type"] == "Sell"]["value_vnd"].sum()
         total    = buy_val + sell_val
+
+        # Thị trường đóng cửa (T7, CN, lễ) → bỏ qua, không upsert row rỗng
+        if total == 0:
+            print("market closed — skip")
+            time.sleep(1)
+            continue
 
         print(f"Mua={buy_val/1e9:.1f}B  Bán={sell_val/1e9:.1f}B  Total={total/1e9:.1f}B VND")
 
@@ -79,23 +83,23 @@ for symbol in ALL_SYMBOLS:
             "symbol": symbol,
             "sector": SYMBOL_TO_SECTOR[symbol],
             "date":   today_str,
-            "volume": float(active["volume"].sum()),  # KL chủ động (cổ phiếu)
-            "value":  float(total),                   # GT chủ động (VND)
+            "volume": float(active["volume"].sum()),
+            "value":  float(total),
         })
 
     except Exception as e:
         print(f"ERROR: {e}")
 
-    # KBS rate limit ~60 req/min với community key → 1s/request là đủ
-    time.sleep(1)
+    time.sleep(1)  # KBS community: 60 req/min
 
 print(f"\nCollected: {len(rows)}/{len(ALL_SYMBOLS)} symbols")
 
 if not rows:
-    raise SystemExit("No data collected — aborting upsert")
+    print("No trading data today (market closed?) — exiting cleanly")
+    raise SystemExit(0)
 
 # ─────────────────────────────────────────────
-# UPSERT — conflict key: (symbol, date)
+# UPSERT
 # ─────────────────────────────────────────────
 supabase.table("vn_market_data").upsert(
     rows,
