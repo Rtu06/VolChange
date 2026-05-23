@@ -2,7 +2,8 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 from supabase import create_client
-from vnstock import Vnstock
+from vnstock_data import Quote
+import time
 
 # ─────────────────────────────────────────────
 # SUPABASE
@@ -39,58 +40,67 @@ for sector, symbols in SECTORS.items():
         SYMBOL_TO_SECTOR[s] = sector
 
 # ─────────────────────────────────────────────
-# DATE
+# DATE — chỉ upsert ngày hôm nay
 # ─────────────────────────────────────────────
-today = datetime.now()
-start_date = (today - timedelta(days=20)).strftime("%Y-%m-%d")
-end_date = today.strftime("%Y-%m-%d")
+today      = datetime.now()
+today_str  = today.strftime("%Y-%m-%d")
 
-print(f"Collecting VNStock data {start_date} -> {end_date}")
+print(f"Collecting VNStock intraday active volume — {today_str}")
 
 rows = []
 
 # ─────────────────────────────────────────────
-# FETCH DATA
+# FETCH DATA — intraday để tính tổng mua + bán chủ động
 # ─────────────────────────────────────────────
+quote = Quote(
+    source="VCI",
+    api_key=os.environ.get("VNSTOCK_API_KEY")
+)
+
 for symbol in ALL_SYMBOLS:
     try:
-        print("Fetching", symbol)
+        print("Fetching intraday:", symbol)
 
-        stock = Vnstock().stock(symbol=symbol, source="VCI")
+        df = quote.intraday(symbol=symbol, page_size=10000)
 
-        df = stock.quote.history(
-            start=start_date,
-            end=end_date,
-            interval="1D"
-        )
-
-        if df.empty:
-            print("Empty:", symbol)
+        if df is None or df.empty:
+            print("  Empty:", symbol)
+            time.sleep(1)
             continue
 
-        for _, r in df.iterrows():
+        # Tính giá trị từng lệnh (giá đơn vị nghìn VND × volume × 1000)
+        df["value_vnd"] = df["price"] * df["volume"] * 1000
 
-            date_str = str(r["time"]).split(" ")[0]
+        # Chỉ lấy lệnh mua + bán chủ động
+        active_df   = df[df["match_type"].isin(["Buy", "Sell"])]
+        active_value = active_df["value_vnd"].sum()
 
-            rows.append({
-                "symbol": symbol,
-                "sector": SYMBOL_TO_SECTOR[symbol],
-                "date": date_str,
-                "close": float(r["close"]),
-                "volume": float(r["volume"]),
-                "value": float(r["volume"]) * float(r["close"])
-            })
+        # Log để debug
+        buy_val  = active_df[active_df["match_type"] == "Buy"]["value_vnd"].sum()
+        sell_val = active_df[active_df["match_type"] == "Sell"]["value_vnd"].sum()
+        print(f"  Mua={buy_val/1e9:.1f}B  Bán={sell_val/1e9:.1f}B  Total={active_value/1e9:.1f}B VND")
+
+        rows.append({
+            "symbol":  symbol,
+            "sector":  SYMBOL_TO_SECTOR[symbol],
+            "date":    today_str,
+            "volume":  float(active_df["volume"].sum()),   # tổng KL chủ động
+            "value":   float(active_value),                # tổng GT chủ động (VND)
+        })
+
+        time.sleep(1)  # tránh rate limit 60 req/min
 
     except Exception as e:
-        print(symbol, e)
+        print(f"  {symbol} error:", e)
+        time.sleep(1)
 
-print("Total rows:", len(rows))
+print(f"\nTotal symbols collected: {len(rows)}")
 
 if len(rows) == 0:
     raise Exception("No VN stock rows collected")
 
 # ─────────────────────────────────────────────
-# UPSERT
+# UPSERT — mỗi ngày 1 row per symbol
 # ─────────────────────────────────────────────
 response = supabase.table("vn_market_data").upsert(
     rows,
@@ -98,10 +108,10 @@ response = supabase.table("vn_market_data").upsert(
     ignore_duplicates=False
 ).execute()
 
-print("Upsert done")
+print("Upsert done:", len(rows), "rows")
 
 # ─────────────────────────────────────────────
-# CLEAN OLD DATA
+# CLEAN OLD DATA — giữ 30 ngày để tính %VOL 5D
 # ─────────────────────────────────────────────
 cutoff = (today - timedelta(days=30)).strftime("%Y-%m-%d")
 
@@ -110,4 +120,4 @@ supabase.table("vn_market_data") \
     .lt("date", cutoff) \
     .execute()
 
-print("Cleanup done")
+print("Cleanup done — kept data since", cutoff)

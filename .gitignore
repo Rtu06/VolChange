@@ -6,3 +6,4 @@ README.md
 # Optional: Database scripts
 reset_table.sql
 supabase_migration.sql
+CLAUDE.md

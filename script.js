@@ -425,27 +425,27 @@ function computeVnRows(data) {
     rows.sort((a, b) => b.date.localeCompare(a.date)); // newest first
     const n = rows.length;
 
-    const vol = (i) => (i < n ? (rows[i].value || 0) : null); // dùng value (VND) cho %Vol
+    // Dùng value (tổng GT mua+bán chủ động, VND) để tính %Vol
+    const val = (i) => (i < n ? (rows[i].value || 0) : null);
 
     const pct = (curr, prev) =>
       curr !== null && prev !== null && prev !== 0
         ? (curr - prev) / prev * 100 : null;
 
     // %Vol 1D: hôm nay vs hôm qua
-    const pctVol1d = pct(vol(0), vol(1));
+    const pctVol1d = pct(val(0), val(1));
 
     // %Vol 5D: tổng 5 ngày gần nhất vs 5 ngày trước đó
     const sum5curr = sumVnRange(rows, 0, 4);
     const sum5prev = sumVnRange(rows, 5, 9);
     const pctVol5d = pct(sum5curr, sum5prev);
 
-    const price   = rows[0]?.close || null;
-    const todayVol = rows[0]?.value || null;
+    const todayVal = rows[0]?.value || null;
 
     // Sparkline 5 ngày: cũ → mới
     const volSpark = [4, 3, 2, 1, 0].map(i => (i < n ? (rows[i].value || 0) : null));
 
-    results.push({ symbol, sector, price, pctVol1d, pctVol5d, todayVol, volSpark });
+    results.push({ symbol, sector, pctVol1d, pctVol5d, todayVal, volSpark });
   }
 
   return results;
@@ -531,10 +531,9 @@ function renderVnSector(sector, rows) {
         <thead>
           <tr>
             <th onclick="sortVnBy('symbol')"   data-vncol="symbol"   ># SYMBOL <span class="sort-arrow">${vnSortCol==='symbol' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
-            <th onclick="sortVnBy('price')"    data-vncol="price"    >GIÁ <span class="sort-arrow">${vnSortCol==='price' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
             <th onclick="sortVnBy('pctVol1d')" data-vncol="pctVol1d" class="${vnSortCol==='pctVol1d'?'active':''}">%VOL 1D <span class="sort-arrow">${vnSortCol==='pctVol1d' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
             <th onclick="sortVnBy('pctVol5d')" data-vncol="pctVol5d" class="${vnSortCol==='pctVol5d'?'active':''}">%VOL 5D <span class="sort-arrow">${vnSortCol==='pctVol5d' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
-            <th>GT KHỚP HÔM NAY</th>
+            <th>GT KHỚP CHỦ ĐỘNG HÔM NAY</th>
             <th>TREND 5D</th>
           </tr>
         </thead>
@@ -560,10 +559,9 @@ function renderVnRow(r, rank) {
            target="_blank" rel="noopener noreferrer">${r.symbol}</a>
       </div>
     </td>
-    <td class="vn-price-cell">${r.price !== null ? formatVnPrice(r.price) : '—'}</td>
     <td>${pctCell(r.pctVol1d)}</td>
     <td>${pctCell(r.pctVol5d)}</td>
-    <td class="vn-vol-cell">${formatVnValue(r.todayVol)}</td>
+    <td class="vn-vol-cell">${formatVnValue(r.todayVal)}</td>
     <td style="padding:4px 14px;vertical-align:middle;">${sparklineSmall(r.volSpark)}</td>
   </tr>`;
 }

@@ -22,7 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install vnstock pandas supabase
+          pip install vnstock_data pandas supabase
 
       - name: Run VNStock collector
         env:
