@@ -383,7 +383,7 @@ async function loadVnData() {
 
   try {
     const since = new Date();
-    since.setDate(since.getDate() - 10); // lấy 10 ngày để tính %Vol 5D
+    since.setDate(since.getDate() - 15); // Lấy 15 ngày để đảm bảo đủ dữ liệu tính %Vol 5D (trừ cuối tuần)
     const sinceDate = since.toISOString().split('T')[0];
 
     const { data, error } = await sb
