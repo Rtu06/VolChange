@@ -461,11 +461,16 @@ function sumVnRange(rows, from, to) {
 
 // ── VN Rendering ──────────────────────────────────────────────
 function renderVnTable() {
-  const q       = vnSearchTerm.toUpperCase();
-  let rows      = q ? vnAllRows.filter(r => r.symbol.includes(q)) : [...vnAllRows];
+  const q    = vnSearchTerm.toUpperCase();
+  let rows   = q ? vnAllRows.filter(r => r.symbol.includes(q)) : [...vnAllRows];
 
-  // Sort within each sector
-  rows.sort((a, b) => {
+  // Tách market index (Toàn sàn) ra khỏi sector rows
+  const MARKET_SYMBOLS = ['HOSE', 'HNX'];
+  const marketRows  = rows.filter(r => MARKET_SYMBOLS.includes(r.symbol));
+  const stockRows   = rows.filter(r => !MARKET_SYMBOLS.includes(r.symbol));
+
+  // Sort stock rows
+  stockRows.sort((a, b) => {
     const av = a[vnSortCol], bv = b[vnSortCol];
     if (av === null && bv === null) return 0;
     if (av === null) return 1;
@@ -480,7 +485,7 @@ function renderVnTable() {
     'Logistics', 'Hàng không', 'Điện & Tiện ích', 'Dược phẩm'
   ];
   const bySetor = {};
-  for (const r of rows) {
+  for (const r of stockRows) {
     if (!bySetor[r.sector]) bySetor[r.sector] = [];
     bySetor[r.sector].push(r);
   }
@@ -492,18 +497,64 @@ function renderVnTable() {
   }
   // Append any unlisted sectors
   for (const [s, rs] of Object.entries(bySetor)) {
-    if (!sectorOrder.includes(s)) sectors.push([s, rs]);
+    if (!sectorOrder.includes(s) && s !== 'Toàn sàn') sectors.push([s, rs]);
   }
 
-  document.getElementById('vn-showing-count').textContent = rows.length;
+  document.getElementById('vn-showing-count').textContent = stockRows.length;
 
   const container = document.getElementById('vn-sectors-container');
-  container.innerHTML = sectors.map(([sector, srows]) =>
+
+  // Render market overview panel đầu tiên (nếu có data)
+  const marketHtml = marketRows.length > 0 ? renderMarketOverview(marketRows) : '';
+
+  container.innerHTML = marketHtml + sectors.map(([sector, srows]) =>
     renderVnSector(sector, srows)
   ).join('');
+}
 
-  // Re-attach event for search filter in vn tab
-  // (already attached once below)
+// ── Market Overview Panel (HOSE / HNX) ───────────────────────
+function renderMarketOverview(marketRows) {
+  // Đảm bảo thứ tự HOSE trước HNX
+  const order   = ['HOSE', 'HNX'];
+  const ordered = order.map(s => marketRows.find(r => r.symbol === s)).filter(Boolean);
+
+  const cards = ordered.map(r => {
+    const label     = r.symbol === 'HOSE' ? 'HOSE (VNINDEX)' : 'HNX';
+    const icon      = r.symbol === 'HOSE' ? '🏛' : '🏢';
+    const pct1dCls  = r.pctVol1d !== null ? (r.pctVol1d > 0 ? 'pos' : r.pctVol1d < 0 ? 'neg' : 'neu') : 'na';
+    const pct5dCls  = r.pctVol5d !== null ? (r.pctVol5d > 0 ? 'pos' : r.pctVol5d < 0 ? 'neg' : 'neu') : 'na';
+    const pct1dTxt  = r.pctVol1d !== null ? (r.pctVol1d > 0 ? '+' : '') + r.pctVol1d.toFixed(2) + '%' : 'N/A';
+    const pct5dTxt  = r.pctVol5d !== null ? (r.pctVol5d > 0 ? '+' : '') + r.pctVol5d.toFixed(2) + '%' : 'N/A';
+
+    return `
+    <div class="market-index-card">
+      <div class="mic-header">
+        <span class="mic-icon">${icon}</span>
+        <span class="mic-label">${label}</span>
+      </div>
+      <div class="mic-value">${formatVnValue(r.todayVal)}<span class="mic-value-unit">GT hôm nay</span></div>
+      <div class="mic-metrics">
+        <div class="mic-metric">
+          <span class="mic-metric-label">%VOL 1D</span>
+          <span class="pct-cell ${pct1dCls} mic-pct">${pct1dTxt}</span>
+        </div>
+        <div class="mic-metric">
+          <span class="mic-metric-label">%VOL 5D</span>
+          <span class="pct-cell ${pct5dCls} mic-pct">${pct5dTxt}</span>
+        </div>
+      </div>
+      <div class="mic-spark">${sparklineSmall(r.volSpark)}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="market-overview-panel">
+    <div class="mop-title">
+      <span class="mop-dot"></span>
+      TỔNG QUAN THỊ TRƯỜNG
+      <span class="mop-sub">Giá trị khớp lệnh toàn sàn</span>
+    </div>
+    <div class="market-index-cards">${cards}</div>
+  </div>`;
 }
 
 function renderVnSector(sector, rows) {

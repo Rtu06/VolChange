@@ -685,3 +685,183 @@ tbody tr.section-divider td {
 .vn-table tbody tr.vn-top-loser td:first-child {
   border-left: 2px solid var(--red);
 }
+
+/* ════════════════════════════════════════════
+   MARKET OVERVIEW PANEL — HOSE / HNX
+   Thêm vào style.css hiện có
+   ════════════════════════════════════════════ */
+
+   .market-overview-panel {
+    margin: 0 0 18px 0;
+    padding: 16px 20px 18px;
+    background: linear-gradient(135deg,
+      rgba(255,255,255,0.03) 0%,
+      rgba(255,255,255,0.01) 100%);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* subtle glow accent trên góc */
+  .market-overview-panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(100, 200, 255, 0.5) 30%,
+      rgba(150, 120, 255, 0.5) 70%,
+      transparent 100%);
+  }
+  
+  .mop-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--muted, #666);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  
+  .mop-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: rgba(100, 200, 255, 0.7);
+    box-shadow: 0 0 6px rgba(100, 200, 255, 0.5);
+    flex-shrink: 0;
+  }
+  
+  .mop-sub {
+    font-weight: 400;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 0.05em;
+    font-size: 9px;
+  }
+  
+  /* ── Cards container ─────────────────────── */
+  .market-index-cards {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  
+  .market-index-card {
+    flex: 1;
+    min-width: 200px;
+    max-width: 360px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 14px 16px 12px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    gap: 4px 12px;
+    align-items: start;
+    transition: border-color 0.2s;
+  }
+  
+  .market-index-card:hover {
+    border-color: rgba(255,255,255,0.16);
+  }
+  
+  /* ── Card header ─────────────────────────── */
+  .mic-header {
+    grid-column: 1; grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .mic-icon {
+    font-size: 14px;
+    line-height: 1;
+  }
+  
+  .mic-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: rgba(255,255,255,0.85);
+  }
+  
+  /* ── Sparkline (top right, spans rows) ───── */
+  .mic-spark {
+    grid-column: 2; grid-row: 1 / 4;
+    align-self: center;
+    display: flex;
+    align-items: center;
+  }
+  
+  /* Override sparklineSmall size for this context */
+  .mic-spark svg {
+    width: 72px !important;
+    height: 32px !important;
+  }
+  
+  /* ── GT hôm nay ──────────────────────────── */
+  .mic-value {
+    grid-column: 1; grid-row: 2;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: 'Space Mono', monospace;
+    color: rgba(255,255,255,0.90);
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    line-height: 1.2;
+    margin-top: 2px;
+  }
+  
+  .mic-value-unit {
+    font-size: 9px;
+    font-weight: 400;
+    font-family: 'Inter', sans-serif;
+    color: rgba(255,255,255,0.30);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    align-self: center;
+  }
+  
+  /* ── Metrics row ─────────────────────────── */
+  .mic-metrics {
+    grid-column: 1; grid-row: 3;
+    display: flex;
+    gap: 14px;
+    margin-top: 6px;
+  }
+  
+  .mic-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .mic-metric-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.30);
+    text-transform: uppercase;
+  }
+  
+  .mic-pct {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    padding: 0 !important;
+  }
+  
+  /* ── Responsive ──────────────────────────── */
+  @media (max-width: 600px) {
+    .market-index-cards {
+      flex-direction: column;
+    }
+    .market-index-card {
+      max-width: 100%;
+    }
+  }
