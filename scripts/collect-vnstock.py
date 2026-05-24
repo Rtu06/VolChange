@@ -19,15 +19,17 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 SECTORS = {
     "Ngân hàng":       ["VCB", "BID", "CTG", "MBB", "TCB", "ACB", "STB", "VPB"],
     "Chứng khoán":     ["SSI", "VND", "HCM", "VCI", "FTS"],
-    "Bất động sản":    ["VIC", "VHM", "NVL", "DXG", "PDR", "KDH"],
-    "Thép & Vật liệu": ["HPG", "HSG", "NKG"],
-    "Công nghệ":       ["FPT", "CMG"],
-    "Tiêu dùng":       ["MWG", "DGW", "PNJ"],
-    "Thực phẩm":       ["VNM", "MSN", "DBC"],
-    "Năng lượng":      ["GAS", "POW", "PVD", "PVS"],
-    "Điện & Tiện ích": ["REE", "NT2", "PC1"],
-    "Logistics":       ["GMD", "HAH", "VSC"],
-    "Hàng không":      ["HVN", "VJC"],
+    "Bất động sản":    ["VIC", "VHM", "NVL", "DXG", "PDR", "KDH", "DIG", "NLG"],
+    "Thép & Vật liệu": ["HPG", "HSG", "NKG", "VGS"],
+    "Công nghệ":       ["FPT", "CMG", "CTR", "ELC"],
+    "Tiêu dùng":       ["MWG", "DGW", "PNJ", "FRT"],
+    "Thực phẩm":       ["VNM", "MSN", "DBC", "PAN"],
+    "Năng lượng":      ["GAS", "POW", "PVD", "PVS", "PLX"],
+    "Điện & Tiện ích": ["REE", "NT2", "PC1", "GEX", "HDG"],
+    "Logistics":       ["GMD", "HAH", "VSC", "PVT"],
+    "Hàng không":      ["HVN", "VJC", "ACV"],
+    "Hóa chất":        ["DGC", "DCM", "DPM", "CSV"],
+    "Đầu tư công":     ["HHV", "VCG", "LCG", "C4G", "FCN"],
 }
 
 ALL_SYMBOLS      = []
