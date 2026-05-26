@@ -153,9 +153,10 @@ function computeRows(data) {
     const pctVol7d   = pct(sumRange(0,6), sumRange(7,13));
 
     const volHistory = [13,12,11,10,9,8,7,6,5,4,3,2,1,0].map(i => vol(i));
+    const priceHistory = [13,12,11,10,9,8,7,6,5,4,3,2,1,0].map(i => pr(i));
 
     results.push({ symbol, price, pctPrice1d, pctPrice2d, pctPrice3d, pctPrice7d,
-                   pctVol1d, pctVol3d, pctVol7d, volHistory, _days: n });
+                   pctVol1d, pctVol3d, pctVol7d, volHistory,priceHistory, _days: n });
   }
   return results;
 }
@@ -256,7 +257,7 @@ function goToPage(page) {
 }
 
 function renderDivider(label, count) {
-  return `<tr class="section-divider"><td colspan="10">
+  return `<tr class="section-divider"><td colspan="11">
     <span class="divider-label">${label}</span>
     <span class="divider-count">${count}</span>
   </td></tr>`;
@@ -284,6 +285,7 @@ function renderRow(r, rank) {
     <td>${pctCell(r.pctPrice2d)}</td>
     <td>${pctCell(r.pctPrice3d)}</td>
     <td>${pctCell(r.pctPrice7d)}</td>
+    <td class="group-sep" style="padding:4px 14px;vertical-align:middle;">${sparkline(r.priceHistory)}</td>
     <td class="group-sep">${pctCell(r.pctVol1d)}</td>
     <td class="group-sep">${pctCell(r.pctVol3d)}</td>
     <td class="group-sep">${pctCell(r.pctVol7d)}</td>
