@@ -51,7 +51,7 @@ MARKET_INDICES = {
 today     = datetime.now()
 today_str = today.strftime("%Y-%m-%d")
 
-print(f"Collecting VNStock intraday active volume — {today_str}")
+print(f"Collecting VNStock daily volume — {today_str}")
 print(f"Total symbols: {len(ALL_SYMBOLS)}")
 
 # ─────────────────────────────────────────────
@@ -80,24 +80,27 @@ for db_symbol, api_symbol in MARKET_INDICES.items():
         df_hist = df_hist.sort_values("time", ascending=False).reset_index(drop=True)
         today_row = df_hist.iloc[0]
 
-        # value = volume * close (ước tính GT giao dịch toàn sàn, VND)
-        # KBS history: volume đơn vị cổ phiếu, close đơn vị VND
-        index_value = float(today_row["volume"]) * float(today_row["close"])
-        index_vol   = float(today_row["volume"])
+        index_vol = float(today_row["volume"])
 
-        if index_value == 0:
+        # Ưu tiên dùng cột value từ sàn (chính xác hơn), fallback volume × close
+        if "value" in df_hist.columns and float(today_row["value"]) > 0:
+            index_value = float(today_row["value"])
+            print(f"Vol={index_vol/1e6:.1f}M cp  GT={index_value/1e9:.0f}B VND (from value col)")
+        else:
+            index_value = index_vol * float(today_row["close"])
+            print(f"Vol={index_vol/1e6:.1f}M cp  GT≈{index_value/1e9:.0f}B VND (vol×close)")
+
+        if index_vol == 0:
             print("market closed — skip")
             time.sleep(1)
             continue
-
-        print(f"Vol={index_vol/1e6:.1f}M cp  GT≈{index_value/1e9:.0f}B VND")
 
         rows.append({
             "symbol": db_symbol,
             "sector": "Toàn sàn",
             "date":   today_str,
             "volume": int(index_vol),
-            "value":  float(index_value),
+            "value":  index_value,
         })
 
     except Exception as e:
@@ -127,21 +130,27 @@ for symbol in ALL_SYMBOLS:
             continue
 
         row = df.iloc[0]
-        vol   = float(row["volume"])
-        close = float(row["close"])
-        value = vol * close   # ước tính GT = volume * giá đóng cửa
+        vol = float(row["volume"])
 
         if vol == 0:
             print("zero volume — skip")
             time.sleep(1)
             continue
 
+        # Ưu tiên dùng cột value từ sàn (chính xác hơn), fallback volume × close
+        if "value" in df.columns and float(row["value"]) > 0:
+            value = float(row["value"])
+            print(f"Vol={vol/1e6:.2f}M cp  GT={value/1e9:.1f}B VND (from value col)")
+        else:
+            value = vol * float(row["close"])
+            print(f"Vol={vol/1e6:.2f}M cp  GT≈{value/1e9:.1f}B VND (vol×close)")
+
         rows.append({
             "symbol": symbol,
             "sector": SYMBOL_TO_SECTOR[symbol],
             "date":   today_str,
             "volume": int(vol),
-            "value":  float(value),
+            "value":  value,
         })
 
     except Exception as e:
