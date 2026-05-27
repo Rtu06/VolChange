@@ -39,11 +39,6 @@ for sector, symbols in SECTORS.items():
         ALL_SYMBOLS.append(s)
         SYMBOL_TO_SECTOR[s] = sector
 
-# Chỉ số toàn sàn: VNINDEX → lưu là HOSE, HNX → lưu là HNX
-MARKET_INDICES = {
-    "HOSE": "VNINDEX",  # symbol lưu DB : symbol gọi API
-    "HNX":  "HNX",
-}
 
 # ─────────────────────────────────────────────
 # DATE
@@ -55,63 +50,10 @@ print(f"Collecting VNStock daily volume — {today_str}")
 print(f"Total symbols: {len(ALL_SYMBOLS)}")
 
 # ─────────────────────────────────────────────
-# FETCH — MARKET INDICES (history volume)
+# FETCH — INDIVIDUAL STOCKS
 # ─────────────────────────────────────────────
 rows = []
 
-print("\n── Market Indices ──")
-for db_symbol, api_symbol in MARKET_INDICES.items():
-    try:
-        print(f"Fetching index {api_symbol} ({db_symbol}) ...", end=" ", flush=True)
-
-        quote = Quote(symbol=api_symbol, source="KBS")
-        # Lấy 2 ngày: hôm nay + hôm qua để tính % (lấy nhiều hơn để chắc)
-        df_hist = quote.history(
-            symbol=api_symbol,
-            length="5D",
-            interval="1D",
-        )
-
-        if df_hist is None or df_hist.empty:
-            print("empty — skip")
-            time.sleep(1)
-            continue
-
-        df_hist = df_hist.sort_values("time", ascending=False).reset_index(drop=True)
-        today_row = df_hist.iloc[0]
-
-        index_vol = float(today_row["volume"])
-
-        # Ưu tiên dùng cột value từ sàn (chính xác hơn), fallback volume × close
-        if "value" in df_hist.columns and float(today_row["value"]) > 0:
-            index_value = float(today_row["value"])
-            print(f"Vol={index_vol/1e6:.1f}M cp  GT={index_value/1e9:.0f}B VND (from value col)")
-        else:
-            index_value = index_vol * float(today_row["close"])
-            print(f"Vol={index_vol/1e6:.1f}M cp  GT≈{index_value/1e9:.0f}B VND (vol×close)")
-
-        if index_vol == 0:
-            print("market closed — skip")
-            time.sleep(1)
-            continue
-
-        rows.append({
-            "symbol": db_symbol,
-            "sector": "Toàn sàn",
-            "date":   today_str,
-            "volume": int(index_vol),
-            "value":  index_value,
-        })
-
-    except Exception as e:
-        print(f"ERROR: {e}")
-
-    time.sleep(1)
-
-# ─────────────────────────────────────────────
-# FETCH — INDIVIDUAL STOCKS
-# ─────────────────────────────────────────────
-print("\n── Individual Stocks ──")
 for symbol in ALL_SYMBOLS:
     try:
         print(f"Fetching {symbol} ...", end=" ", flush=True)
@@ -142,7 +84,7 @@ for symbol in ALL_SYMBOLS:
             value = float(row["value"])
             print(f"Vol={vol/1e6:.2f}M cp  GT={value/1e9:.1f}B VND (from value col)")
         else:
-            value = vol * float(row["close"])
+            value = vol * float(row["close"])*1000
             print(f"Vol={vol/1e6:.2f}M cp  GT≈{value/1e9:.1f}B VND (vol×close)")
 
         rows.append({
