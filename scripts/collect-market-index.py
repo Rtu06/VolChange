@@ -76,6 +76,15 @@ for db_symbol, cafef_symbol in INDICES.items():
     except Exception as e:
         print(f"{db_symbol}: ERROR — {e}")
 
+    resp = requests.get(url, headers=HEADERS, timeout=10)
+    resp.raise_for_status()
+
+    # DEBUG: print raw để xem CafeF trả về gì
+    print(f"  Status: {resp.status_code}")
+    print(f"  Content-Type: {resp.headers.get('Content-Type')}")
+    print(f"  Raw (500 chars): {resp.text[:500]}")
+
+    data = resp.json()
 # ─────────────────────────────────────────────
 # UPSERT
 # ─────────────────────────────────────────────
