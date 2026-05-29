@@ -12,13 +12,15 @@ SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Referer": "https://cafef.vn/",
+    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Referer":         "https://cafef.vn/",
+    "Accept":          "application/json, text/plain, */*",
+    "Accept-Language": "vi-VN,vi;q=0.9",
 }
 
 INDICES = {
     "HOSE": "VNINDEX",
-    "HNX":  "HNXINDEX",
+    "HNX":  "HNX-INDEX",   # ← đúng tên CafeF dùng
 }
 
 today      = datetime.now()
@@ -32,17 +34,31 @@ print(f"Collecting market index from CafeF — {today_str}")
 # ─────────────────────────────────────────────
 rows = []
 
+BASE_URL = "https://cafef.vn/du-lieu/ajax/pagenew/datahistory/pricehistory.ashx"
+
 for db_symbol, cafef_symbol in INDICES.items():
     try:
-        url = (
-            "https://s.cafef.vn/ajax/PageNew/DataHistory/PriceHistory.ashx"
-            f"?Symbol={cafef_symbol}"
-            f"&StartDate={cafef_date}&EndDate={cafef_date}"
-            "&PageIndex=1&PageSize=1"
-        )
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        # Dùng params= thay vì nối string để tránh mất params khi redirect
+        params = {
+            "Symbol":    cafef_symbol,
+            "StartDate": cafef_date,
+            "EndDate":   cafef_date,
+            "PageIndex": "1",
+            "PageSize":  "1",
+        }
+
+        resp = requests.get(BASE_URL, params=params, headers=HEADERS, timeout=10)
         resp.raise_for_status()
+
+        # Debug: xác nhận URL thực và response
+        print(f"  Final URL: {resp.url}")
+        print(f"  Raw (200 chars): {resp.text[:200]}")
+
         data = resp.json()
+
+        if not data.get("Success"):
+            print(f"{db_symbol}: API trả về Success=false — {data.get('Message')}")
+            continue
 
         items = data.get("Data", {}).get("Data", [])
         if not items:
@@ -51,11 +67,12 @@ for db_symbol, cafef_symbol in INDICES.items():
 
         item = items[0]
 
-        # Debug lần đầu: in keys để xác nhận field name
+        # Debug lần đầu: xác nhận field name
         print(f"  Fields: {list(item.keys())}")
 
         volume = item.get("TongKhoiLuongKhopLenh", 0) or 0
-        # Đơn vị CafeF: tỷ VND → nhân 1e9 để ra VND
+
+        # TongGiaTriKhopLenh đơn vị tỷ VND → nhân 1e9 ra VND
         value_ty = item.get("TongGiaTriKhopLenh", 0) or 0
         value = float(value_ty) * 1_000_000_000
 
@@ -76,15 +93,6 @@ for db_symbol, cafef_symbol in INDICES.items():
     except Exception as e:
         print(f"{db_symbol}: ERROR — {e}")
 
-    resp = requests.get(url, headers=HEADERS, timeout=10)
-    resp.raise_for_status()
-
-    # DEBUG: print raw để xem CafeF trả về gì
-    print(f"  Status: {resp.status_code}")
-    print(f"  Content-Type: {resp.headers.get('Content-Type')}")
-    print(f"  Raw (500 chars): {resp.text[:500]}")
-
-    data = resp.json()
 # ─────────────────────────────────────────────
 # UPSERT
 # ─────────────────────────────────────────────
