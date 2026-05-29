@@ -390,7 +390,7 @@ async function loadVnData() {
 
     const { data, error } = await sb
       .from('vn_market_data')
-      .select('symbol, sector, date, close, volume, value')
+      .select('symbol, sector, date, volume, value')
       .gte('date', sinceDate)
       .order('date', { ascending: false });
 
