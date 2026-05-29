@@ -50,10 +50,6 @@ for db_symbol, cafef_symbol in INDICES.items():
         resp = requests.get(BASE_URL, params=params, headers=HEADERS, timeout=10)
         resp.raise_for_status()
 
-        # Debug: xác nhận URL thực và response
-        print(f"  Final URL: {resp.url}")
-        print(f"  Raw (200 chars): {resp.text[:200]}")
-
         data = resp.json()
 
         if not data.get("Success"):
@@ -67,17 +63,21 @@ for db_symbol, cafef_symbol in INDICES.items():
 
         item = items[0]
 
-        # Debug lần đầu: xác nhận field name
-        print(f"  Fields: {list(item.keys())}")
+        # Lấy ngày từ response — CafeF có thể trả ngày gần nhất, không phải today
+        raw_date = item.get("Ngay", "")
+        try:
+            record_date = datetime.strptime(raw_date[:10], "%d/%m/%Y").strftime("%Y-%m-%d")
+        except Exception:
+            record_date = today_str
+        print(f"  {db_symbol} record date: {record_date}")
 
-        volume = item.get("TongKhoiLuongKhopLenh", 0) or 0
-
-        # TongGiaTriKhopLenh đơn vị tỷ VND → nhân 1e9 ra VND
-        value_ty = item.get("TongGiaTriKhopLenh", 0) or 0
-        value = float(value_ty) * 1_000_000_000
+        volume   = item.get("KhoiLuongKhopLenh", 0) or 0
+        # GiaTriKhopLenh đơn vị tỷ VND → nhân 1e9 ra VND
+        value_ty = item.get("GiaTriKhopLenh", 0) or 0
+        value    = float(value_ty) * 1_000_000_000
 
         if volume == 0:
-            print(f"{db_symbol}: zero volume — market closed")
+            print(f"{db_symbol}: zero volume — skip")
             continue
 
         print(f"{db_symbol}: Vol={volume/1e6:.0f}M cp  GT={value/1e9:.0f}B VND")
@@ -85,7 +85,7 @@ for db_symbol, cafef_symbol in INDICES.items():
         rows.append({
             "symbol": db_symbol,
             "sector": "Toàn sàn",
-            "date":   today_str,
+            "date":   record_date,   # ← dùng ngày từ response, không phải today
             "volume": int(volume),
             "value":  value,
         })
