@@ -385,7 +385,7 @@ async function loadVnData() {
 
   try {
     const since = new Date();
-    since.setDate(since.getDate() - 15); // Lấy 15 ngày để đảm bảo đủ dữ liệu tính %Vol 5D (trừ cuối tuần)
+    since.setDate(since.getDate() - 30); // Lấy 30 ngày để đảm bảo đủ dữ liệu 20 ngày trading (trừ cuối tuần)
     const sinceDate = since.toISOString().split('T')[0];
 
     const { data, error } = await sb
@@ -444,8 +444,8 @@ function computeVnRows(data) {
 
     const todayVal = rows[0]?.value || null;
 
-    // Sparkline 5 ngày: cũ → mới
-    const volSpark = [4, 3, 2, 1, 0].map(i => (i < n ? (rows[i].value || 0) : null));
+    // Sparkline 20 ngày: cũ → mới
+    const volSpark = [19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0].map(i => (i < n ? (rows[i].value || 0) : null));
 
     results.push({ symbol, sector, pctVol1d, pctVol5d, todayVal, volSpark });
   }
@@ -562,9 +562,8 @@ function renderMarketOverview(marketRows) {
 function renderVnSector(sector, rows) {
   const isCollapsed = vnCollapsed[sector] || false;
 
-  // Compute sector averages for header display
-  const avg1d = avgValid(rows.map(r => r.pctVol1d));
-  const avg5d = avgValid(rows.map(r => r.pctVol5d));
+  // Compute sector total value today
+  const totalVal = rows.reduce((s, r) => s + (r.todayVal || 0), 0) || null;
 
   const bodyHeight = rows.length * 36 + 33; // 33px thead
 
@@ -575,8 +574,7 @@ function renderVnSector(sector, rows) {
       <span class="vn-sector-name">${sector}</span>
       <span class="vn-sector-count">${rows.length} mã</span>
       <div class="vn-sector-avg">
-        <div class="vn-avg-chip">1D avg: <span class="${avg1d !== null ? (avg1d > 0 ? 'pct-cell pos' : avg1d < 0 ? 'pct-cell neg' : 'pct-cell neu') : 'pct-cell na'}">${avg1d !== null ? (avg1d > 0 ? '+' : '') + avg1d.toFixed(1) + '%' : 'N/A'}</span></div>
-        <div class="vn-avg-chip">5D avg: <span class="${avg5d !== null ? (avg5d > 0 ? 'pct-cell pos' : avg5d < 0 ? 'pct-cell neg' : 'pct-cell neu') : 'pct-cell na'}">${avg5d !== null ? (avg5d > 0 ? '+' : '') + avg5d.toFixed(1) + '%' : 'N/A'}</span></div>
+        <div class="vn-avg-chip">GT HÔM NAY: <span class="vn-sector-total-val">${totalVal ? formatVnValue(totalVal) : '<span class="pct-cell na">N/A</span>'}</span></div>
       </div>
     </div>
     <div class="vn-sector-body" style="max-height:${isCollapsed ? 0 : bodyHeight}px">
@@ -744,9 +742,9 @@ function formatTime(d) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────
-function avgValid(arr) {
+function sumValid(arr) {
   const valid = arr.filter(v => v !== null);
-  return valid.length > 0 ? valid.reduce((s, v) => s + v, 0) / valid.length : null;
+  return valid.length > 0 ? valid.reduce((s, v) => s + v, 0) : null;
 }
 
 function safeid(str) {
