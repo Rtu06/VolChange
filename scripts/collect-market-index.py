@@ -1,6 +1,6 @@
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from supabase import create_client
 
 # ─────────────────────────────────────────────
@@ -38,54 +38,63 @@ BASE_URL = "https://cafef.vn/du-lieu/ajax/pagenew/datahistory/pricehistory.ashx"
 
 for db_symbol, cafef_symbol in INDICES.items():
     try:
-        # Dùng params= thay vì nối string để tránh mất params khi redirect
-        params = {
-            "Symbol":    cafef_symbol,
-            "StartDate": cafef_date,
-            "EndDate":   cafef_date,
-            "PageIndex": "1",
-            "PageSize":  "1",
-        }
+        fetched = None
+        
+        for days_back in range(0, 3):  # thử today, yesterday, day before
+            check_date = today - timedelta(days=days_back)
+            cafef_date = check_date.strftime("%Y/%m/%d")
 
-        resp = requests.get(BASE_URL, params=params, headers=HEADERS, timeout=10)
-        resp.raise_for_status()
+            params = {
+                "Symbol":    cafef_symbol,
+                "StartDate": cafef_date,
+                "EndDate":   cafef_date,
+                "PageIndex": "1",
+                "PageSize":  "1",
+            }
 
-        data = resp.json()
+            resp = requests.get(BASE_URL, params=params, headers=HEADERS, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
 
-        if not data.get("Success"):
-            print(f"{db_symbol}: API trả về Success=false — {data.get('Message')}")
+            if not data.get("Success"):
+                print(f"{db_symbol}: API Success=false — {data.get('Message')}")
+                continue
+
+            items = data.get("Data", {}).get("Data", [])
+            if not items:
+                print(f"{db_symbol}: no data for {cafef_date}, trying previous day...")
+                continue
+
+            item = items[0]
+            volume = item.get("KhoiLuongKhopLenh", 0) or 0
+            if volume == 0:
+                print(f"{db_symbol}: zero volume for {cafef_date}, trying previous day...")
+                continue
+
+            fetched = (item, check_date)
+            break
+
+        if not fetched:
+            print(f"{db_symbol}: no valid data after 3 attempts — skip")
             continue
 
-        items = data.get("Data", {}).get("Data", [])
-        if not items:
-            print(f"{db_symbol} ({cafef_symbol}): no data — market closed?")
-            continue
-
-        item = items[0]
-
-        # Lấy ngày từ response — CafeF có thể trả ngày gần nhất, không phải today
+        item, record_date_obj = fetched
         raw_date = item.get("Ngay", "")
         try:
             record_date = datetime.strptime(raw_date[:10], "%Y/%m/%d").strftime("%Y-%m-%d")
         except Exception:
-            record_date = today_str
-        print(f"  {db_symbol} record date: {record_date}")
+            record_date = record_date_obj.strftime("%Y-%m-%d")
 
         volume   = item.get("KhoiLuongKhopLenh", 0) or 0
-        # GiaTriKhopLenh đơn vị tỷ VND → nhân 1e9 ra VND
         value_ty = item.get("GiaTriKhopLenh", 0) or 0
         value    = float(value_ty) * 1_000_000_000
 
-        if volume == 0:
-            print(f"{db_symbol}: zero volume — skip")
-            continue
-
-        print(f"{db_symbol}: Vol={volume/1e6:.0f}M cp  GT={value/1e9:.0f}B VND")
+        print(f"{db_symbol} ({record_date}): Vol={volume/1e6:.0f}M cp  GT={value/1e9:.0f}B VND")
 
         rows.append({
             "symbol": db_symbol,
             "sector": "Toàn sàn",
-            "date":   record_date,   # ← dùng ngày từ response, không phải today
+            "date":   record_date,
             "volume": int(volume),
             "value":  value,
         })
