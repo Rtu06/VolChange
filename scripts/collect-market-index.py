@@ -25,7 +25,7 @@ INDICES = {
 
 today      = datetime.now()
 today_str  = today.strftime("%Y-%m-%d")
-cafef_date = today.strftime("%d/%m/%Y")
+cafef_date = today.strftime("%Y/%m/%d")
 
 print(f"Collecting market index from CafeF — {today_str}")
 
@@ -66,7 +66,7 @@ for db_symbol, cafef_symbol in INDICES.items():
         # Lấy ngày từ response — CafeF có thể trả ngày gần nhất, không phải today
         raw_date = item.get("Ngay", "")
         try:
-            record_date = datetime.strptime(raw_date[:10], "%d/%m/%Y").strftime("%Y-%m-%d")
+            record_date = datetime.strptime(raw_date[:10], "%Y/%m/%d").strftime("%Y-%m-%d")
         except Exception:
             record_date = today_str
         print(f"  {db_symbol} record date: {record_date}")
