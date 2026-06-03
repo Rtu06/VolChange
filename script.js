@@ -447,7 +447,8 @@ function computeVnRows(data) {
     // Sparkline 20 ngày: cũ → mới
     const volSpark = [19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0].map(i => (i < n ? (rows[i].value || 0) : null));
 
-    results.push({ symbol, sector, pctVol1d, pctVol5d, todayVal, volSpark });
+    results.push({ symbol, sector, pctVol1d, pctVol5d, todayVal, volSpark,
+                   val0: val(0), val1: val(1), sum5curr, sum5prev });
   }
 
   return results;
@@ -509,9 +510,17 @@ function renderVnTable() {
   // Render market overview panel đầu tiên (nếu có data)
   const marketHtml = marketRows.length > 0 ? renderMarketOverview(marketRows) : '';
 
-  container.innerHTML = marketHtml + sectors.map(([sector, srows]) =>
-    renderVnSector(sector, srows)
-  ).join('');
+  const pct = (curr, prev) =>
+    curr !== null && prev !== null && prev !== 0
+      ? (curr - prev) / prev * 100 : null;
+
+  container.innerHTML = marketHtml + sectors.map(([sector, srows]) => {
+    const s0   = srows.reduce((s, r) => s + (r.val0     || 0), 0) || null;
+    const s1   = srows.reduce((s, r) => s + (r.val1     || 0), 0) || null;
+    const sc   = srows.reduce((s, r) => s + (r.sum5curr || 0), 0) || null;
+    const sp   = srows.reduce((s, r) => s + (r.sum5prev || 0), 0) || null;
+    return renderVnSector(sector, srows, pct(s0, s1), pct(sc, sp));
+  }).join('');
 }
 
 // ── Market Overview Panel (HOSE / HNX) ───────────────────────
@@ -559,7 +568,7 @@ function renderMarketOverview(marketRows) {
   </div>`;
 }
 
-function renderVnSector(sector, rows) {
+function renderVnSector(sector, rows, sectorPct1d, sectorPct5d) {
   const isCollapsed = vnCollapsed[sector] || false;
 
   // Compute sector total value today
@@ -575,6 +584,8 @@ function renderVnSector(sector, rows) {
       <span class="vn-sector-count">${rows.length} mã</span>
       <div class="vn-sector-avg">
         <div class="vn-avg-chip">GT HÔM NAY: <span class="vn-sector-total-val">${totalVal ? formatVnValue(totalVal) : '<span class="pct-cell na">N/A</span>'}</span></div>
+        <div class="vn-avg-chip">%GT 1D: ${pctCell(sectorPct1d)}</div>
+        <div class="vn-avg-chip">%GT 5D: ${pctCell(sectorPct5d)}</div>
       </div>
     </div>
     <div class="vn-sector-body" style="max-height:${isCollapsed ? 0 : bodyHeight}px">
