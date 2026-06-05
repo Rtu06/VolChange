@@ -40,7 +40,7 @@ for db_symbol, cafef_symbol in INDICES.items():
     try:
         fetched = None
         
-        for days_back in range(0, 3):  # thử today, yesterday, day before
+        for days_back in range(1, 4): # thử lùi ngày tối đa 3 ngày nếu hôm nay chưa có dữ liệu
             check_date = today - timedelta(days=days_back)
             cafef_date = check_date.strftime("%Y/%m/%d")
 

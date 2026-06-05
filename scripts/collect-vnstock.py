@@ -17,19 +17,25 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # DANH SÁCH CỔ PHIẾU + SECTOR
 # ─────────────────────────────────────────────
 SECTORS = {
-    "Ngân hàng":       ["VCB", "BID", "CTG", "MBB", "TCB", "ACB", "STB", "VPB"],
-    "Chứng khoán":     ["SSI", "VND", "HCM", "VCI", "FTS"],
-    "Bất động sản":    ["VIC", "VHM", "NVL", "DXG", "PDR", "KDH", "DIG", "NLG"],
-    "Thép & Vật liệu": ["HPG", "HSG", "NKG", "VGS"],
-    "Công nghệ":       ["FPT", "CMG", "CTR", "ELC"],
-    "Tiêu dùng":       ["MWG", "DGW", "PNJ", "FRT"],
-    "Thực phẩm":       ["VNM", "MSN", "DBC", "PAN"],
-    "Năng lượng":      ["GAS", "POW", "PVD", "PVS", "PLX"],
-    "Điện & Tiện ích": ["REE", "NT2", "PC1", "GEX", "HDG"],
-    "Logistics":       ["GMD", "HAH", "VSC", "PVT"],
-    "Hàng không":      ["HVN", "VJC", "ACV"],
-    "Hóa chất":        ["DGC", "DCM", "DPM", "CSV"],
-    "Đầu tư công":     ["HHV", "VCG", "LCG", "C4G", "FCN"],
+  "Dầu khí":                             ["GAS", "PLX", "BSR", "PVD", "PVS", "OIL"],
+  "Hóa chất":                            ["DGC", "DPM", "DCM", "CSV", "BFC", "LAS"],
+  "Tài nguyên":                          ["HPG", "HSG", "NKG", "MSR", "KSV"],
+  "Xây dựng & Vật liệu":                 ["CTD", "VCG", "HHV", "C4G", "HT1", "BCC"],
+  "Hàng hóa và dịch vụ công nghiệp":     ["GEX", "ACV", "VSC", "HAH", "PHP", "VTP"],
+  "Ô tô & linh kiện phụ tùng":           ["VEA", "HAX", "SVC", "TMT", "DRC", "CSM"],
+  "Thực phẩm & Đồ uống":                 ["MSN", "VNM", "MCH", "SAB", "QNS", "DBC", "BAF", "KDC"],
+  "Đồ dùng cá nhân và đồ gia dụng":      ["PNJ", "RAL", "SAV"],
+  "Y tế":                                ["DVN", "DHG", "IMP", "TRA", "DBD"],
+  "Dịch vụ bán lẻ":                      ["MWG", "FRT", "DGW", "PET"],
+  "Phương tiện truyền thông":            ["YEG", "ADS", "TTT"],
+  "Du lịch & Giải trí":                  ["VJC", "HVN", "VTR", "SKG"],
+  "Viễn thông":                          ["VGI", "CTR", "FOX", "MFS"],
+  "Dịch vụ tiện ích":                    ["POW", "REE", "BWE", "GEG", "NT2", "TDM"],
+  "Ngân hàng":                           ["VCB", "BID", "CTG", "TCB", "VPB", "MBB", "ACB", "HDB"],
+  "Bảo hiểm":                            ["BVH", "PVI", "BMI", "MIG", "BIC"],
+  "Bất động sản":                        ["VIC", "VHM", "VRE", "NVL", "KDH", "NLG", "PDR", "DXG"],
+  "Dịch vụ tài chính":                   ["SSI", "VND", "HCM", "VCI", "SHS", "FTS", "MBS", "BSI"],
+  "Công nghệ":                           ["FPT", "CMG", "ELC", "ITD"]
 }
 
 ALL_SYMBOLS      = []

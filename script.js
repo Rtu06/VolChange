@@ -483,9 +483,10 @@ function renderVnTable() {
 
   // Group by sector (preserve original sector order)
   const sectorOrder = [
-    'Ngân hàng', 'Bất động sản', 'Chứng khoán', 'Công nghệ',
-    'Năng lượng', 'Thép & Vật liệu', 'Tiêu dùng', 'Thực phẩm',
-    'Logistics', 'Hàng không', 'Điện & Tiện ích', 'Dược phẩm'
+    'Dầu khí', 'Hoá chất', 'Tài nguyên', 'Xây dựng và vật liệu',
+    'Hàng hoá và dịch vụ công nghiệp', 'Ô tô & linh kiện phụ tùng', 'Thực phẩm và đồ uống', 'Đồ dùng cá nhân và đồ gia dụng',
+    'Y tế', 'Dịch vụ bán lẻ', 'Phương tiện truyền thông', 'Du lịch và giải trí', 'Viễn thông','Dịch vụ tiện ích',
+    'Ngân hàng','Bảo hiểm', 'Bất động sản', "Dịch vụ tài chính", 'Công nghệ', 
   ];
   const bySetor = {};
   for (const r of stockRows) {
