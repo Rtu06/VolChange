@@ -38,52 +38,36 @@ BASE_URL = "https://cafef.vn/du-lieu/ajax/pagenew/datahistory/pricehistory.ashx"
 
 for db_symbol, cafef_symbol in INDICES.items():
     try:
-        fetched = None
-        
-        for days_back in range(1, 4): # thử lùi ngày tối đa 3 ngày nếu hôm nay chưa có dữ liệu
-            check_date = today - timedelta(days=days_back)
-            cafef_date = check_date.strftime("%Y/%m/%d")
+        yesterday = today - timedelta(days=1)
+        cafef_date = yesterday.strftime("%Y/%m/%d")
 
-            params = {
-                "Symbol":    cafef_symbol,
-                "StartDate": cafef_date,
-                "EndDate":   cafef_date,
-                "PageIndex": "1",
-                "PageSize":  "1",
-            }
+        params = {
+            "Symbol":    cafef_symbol,
+            "StartDate": cafef_date,
+            "EndDate":   cafef_date,
+            "PageIndex": "1",
+            "PageSize":  "1",
+        }
 
-            resp = requests.get(BASE_URL, params=params, headers=HEADERS, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
+        resp = requests.get(BASE_URL, params=params, headers=HEADERS, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
 
-            if not data.get("Success"):
-                print(f"{db_symbol}: API Success=false — {data.get('Message')}")
-                continue
-
-            items = data.get("Data", {}).get("Data", [])
-            if not items:
-                print(f"{db_symbol}: no data for {cafef_date}, trying previous day...")
-                continue
-
-            item = items[0]
-            volume = item.get("KhoiLuongKhopLenh", 0) or 0
-            if volume == 0:
-                print(f"{db_symbol}: zero volume for {cafef_date}, trying previous day...")
-                continue
-
-            fetched = (item, check_date)
-            break
-
-        if not fetched:
-            print(f"{db_symbol}: no valid data after 3 attempts — skip")
+        if not data.get("Success"):
+            print(f"{db_symbol}: API Success=false — {data.get('Message')}")
             continue
 
-        item, record_date_obj = fetched
+        items = data.get("Data", {}).get("Data", [])
+        if not items:
+            print(f"{db_symbol}: no data for {cafef_date} — skip")
+            continue
+
+        item = items[0]
         raw_date = item.get("Ngay", "")
         try:
             record_date = datetime.strptime(raw_date[:10], "%Y/%m/%d").strftime("%Y-%m-%d")
         except Exception:
-            record_date = record_date_obj.strftime("%Y-%m-%d")
+            record_date = yesterday.strftime("%Y-%m-%d")
 
         volume   = item.get("KhoiLuongKhopLenh", 0) or 0
         value_ty = item.get("GiaTriKhopLenh", 0) or 0
