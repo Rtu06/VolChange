@@ -2,7 +2,7 @@ name: VNStock Market Index Collector
 
 on:
   schedule:
-    # 17:30 VN = 10:30 UTC — chạy sau collect-vnstock.yml 30 phút
+    # 10:30 VN = 3:30 UTC hôm sau mới chạy để lấy dữ liệu ngày hôm trước
     - cron: '30 3 * * 2-6'
 
   workflow_dispatch:
