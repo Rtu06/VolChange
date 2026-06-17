@@ -39,16 +39,22 @@ BASE_URL = "https://cafef.vn/du-lieu/ajax/pagenew/datahistory/pricehistory.ashx"
 for db_symbol, cafef_symbol in INDICES.items():
     try:
         row_data = None
-        for days_back in range(1, 7):  # thử tối đa 5 ngày lùi
-            target = today - timedelta(days=days_back)
-            cafef_date = target.strftime("%Y/%m/%d")
+
+        if db_symbol == "HOSE":
+            # CafeF bỏ qua StartDate/EndDate khi query VNINDEX trong giờ giao dịch —
+            # luôn trả về snapshot của hôm nay (GiaTriKhopLenh=0 vì chưa chốt EOD),
+            # nên kiểu query từng-ngày-một như HNX không dùng được cho symbol này.
+            # Fix: query 1 lần lấy range nhiều ngày, rồi tự lọc bản ghi hợp lệ
+            # trong list trả về (bỏ bản ghi của hôm nay, lấy gần nhất có GT>0).
+            range_start = (today - timedelta(days=10)).strftime("%Y/%m/%d")
+            range_end   = today.strftime("%Y/%m/%d")
 
             params = {
                 "Symbol":    cafef_symbol,
-                "StartDate": cafef_date,
-                "EndDate":   cafef_date,
+                "StartDate": range_start,
+                "EndDate":   range_end,
                 "PageIndex": "1",
-                "PageSize":  "1",
+                "PageSize":  "15",
             }
 
             resp = requests.get(BASE_URL, params=params, headers=HEADERS, timeout=10)
@@ -57,44 +63,92 @@ for db_symbol, cafef_symbol in INDICES.items():
 
             if not data.get("Success"):
                 print(f"{db_symbol}: API Success=false — {data.get('Message')}")
+            else:
+                items = data.get("Data", {}).get("Data", [])
+                for item in items:
+                    raw_date = item.get("Ngay", "")
+                    try:
+                        record_date = datetime.strptime(raw_date[:10], "%Y/%m/%d").strftime("%Y-%m-%d")
+                    except Exception:
+                        continue
+
+                    if record_date == today_str:
+                        # bỏ bản ghi hôm nay — có thể là snapshot live chưa chốt GT
+                        continue
+
+                    value_ty = item.get("GiaTriKhopLenh", 0) or 0
+                    value    = float(value_ty) * 1_000_000_000
+                    if value == 0:
+                        continue
+
+                    volume = item.get("KhoiLuongKhopLenh", 0) or 0
+                    print(f"{db_symbol} ({record_date}): Vol={volume/1e6:.0f}M cp  GT={value/1e9:.0f}B VND")
+
+                    row_data = {
+                        "symbol": db_symbol,
+                        "sector": "Toàn sàn",
+                        "date":   record_date,
+                        "volume": int(volume),
+                        "value":  value,
+                    }
+                    break
+
+        else:
+            for days_back in range(1, 7):  # thử tối đa 5 ngày lùi
+                target = today - timedelta(days=days_back)
+                cafef_date = target.strftime("%Y/%m/%d")
+
+                params = {
+                    "Symbol":    cafef_symbol,
+                    "StartDate": cafef_date,
+                    "EndDate":   cafef_date,
+                    "PageIndex": "1",
+                    "PageSize":  "1",
+                }
+
+                resp = requests.get(BASE_URL, params=params, headers=HEADERS, timeout=10)
+                resp.raise_for_status()
+                data = resp.json()
+
+                if not data.get("Success"):
+                    print(f"{db_symbol}: API Success=false — {data.get('Message')}")
+                    break
+
+                items = data.get("Data", {}).get("Data", [])
+                if not items:
+                    print(f"{db_symbol}: no data for {cafef_date} — thử ngày trước")
+                    continue
+
+                item = items[0]
+                value_ty = item.get("GiaTriKhopLenh", 0) or 0
+                value    = float(value_ty) * 1_000_000_000
+
+                if value == 0:
+                    print(f"{db_symbol}: GT=0 cho {cafef_date} — thử ngày trước")
+                    continue
+
+                raw_date = item.get("Ngay", "")
+                try:
+                    record_date = datetime.strptime(raw_date[:10], "%Y/%m/%d").strftime("%Y-%m-%d")
+                except Exception:
+                    record_date = target.strftime("%Y-%m-%d")
+
+                volume = item.get("KhoiLuongKhopLenh", 0) or 0
+                print(f"{db_symbol} ({record_date}): Vol={volume/1e6:.0f}M cp  GT={value/1e9:.0f}B VND")
+
+                row_data = {
+                    "symbol": db_symbol,
+                    "sector": "Toàn sàn",
+                    "date":   record_date,
+                    "volume": int(volume),
+                    "value":  value,
+                }
                 break
-
-            items = data.get("Data", {}).get("Data", [])
-            if not items:
-                print(f"{db_symbol}: no data for {cafef_date} — thử ngày trước")
-                continue
-
-            item = items[0]
-            value_ty = item.get("GiaTriKhopLenh", 0) or 0
-            value    = float(value_ty) * 1_000_000_000
-            print(f"{db_symbol} RAW: {item}")
-
-            if value == 0:
-                print(f"{db_symbol}: GT=0 cho {cafef_date} — thử ngày trước")
-                continue
-
-            raw_date = item.get("Ngay", "")
-            try:
-                record_date = datetime.strptime(raw_date[:10], "%Y/%m/%d").strftime("%Y-%m-%d")
-            except Exception:
-                record_date = target.strftime("%Y-%m-%d")
-
-            volume = item.get("KhoiLuongKhopLenh", 0) or 0
-            print(f"{db_symbol} ({record_date}): Vol={volume/1e6:.0f}M cp  GT={value/1e9:.0f}B VND")
-
-            row_data = {
-                "symbol": db_symbol,
-                "sector": "Toàn sàn",
-                "date":   record_date,
-                "volume": int(volume),
-                "value":  value,
-            }
-            break
 
         if row_data:
             rows.append(row_data)
         else:
-            print(f"{db_symbol}: không tìm được dữ liệu GT>0 trong 5 ngày — skip")
+            print(f"{db_symbol}: không tìm được dữ liệu GT>0 — skip")
 
     except Exception as e:
         print(f"{db_symbol}: ERROR — {e}")
