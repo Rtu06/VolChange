@@ -65,13 +65,10 @@ for db_symbol, cafef_symbol in INDICES.items():
                 print(f"{db_symbol}: API Success=false — {data.get('Message')}")
             else:
                 items = data.get("Data", {}).get("Data", [])
-                print(f"{db_symbol} DEBUG: items_count={len(items)}")
-                for item in items:
-                    print(f"{db_symbol} DEBUG ITEM: {item}")
                 for item in items:
                     raw_date = item.get("Ngay", "")
                     try:
-                        record_date = datetime.strptime(raw_date[:10], "%Y/%m/%d").strftime("%Y-%m-%d")
+                        record_date = datetime.strptime(raw_date[:10], "%d/%m/%Y").strftime("%Y-%m-%d")
                     except Exception:
                         continue
 
@@ -132,7 +129,7 @@ for db_symbol, cafef_symbol in INDICES.items():
 
                 raw_date = item.get("Ngay", "")
                 try:
-                    record_date = datetime.strptime(raw_date[:10], "%Y/%m/%d").strftime("%Y-%m-%d")
+                    record_date = datetime.strptime(raw_date[:10], "%d/%m/%Y").strftime("%Y-%m-%d")
                 except Exception:
                     record_date = target.strftime("%Y-%m-%d")
 
