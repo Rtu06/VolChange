@@ -544,7 +544,7 @@ function renderMarketOverview(marketRows) {
         <span class="mic-icon">${icon}</span>
         <span class="mic-label">${label}</span>
       </div>
-      <div class="mic-value">${formatVnValue(r.todayVal)}<span class="mic-value-unit">GT hôm nay</span></div>
+      <div class="mic-value">${formatVnValue(r.todayVal)}<span class="mic-value-unit">GT hôm qua</span></div>
       <div class="mic-metrics">
         <div class="mic-metric">
           <span class="mic-metric-label">%VOL 1D</span>
@@ -584,7 +584,7 @@ function renderVnSector(sector, rows, sectorPct1d, sectorPct5d) {
       <span class="vn-sector-name">${sector}</span>
       <span class="vn-sector-count">${rows.length} mã</span>
       <div class="vn-sector-avg">
-        <div class="vn-avg-chip">GT HÔM NAY: <span class="vn-sector-total-val">${totalVal ? formatVnValue(totalVal) : '<span class="pct-cell na">N/A</span>'}</span></div>
+        <div class="vn-avg-chip">GT HÔM QUA: <span class="vn-sector-total-val">${totalVal ? formatVnValue(totalVal) : '<span class="pct-cell na">N/A</span>'}</span></div>
         <div class="vn-avg-chip">%GT 1D: ${pctCell(sectorPct1d)}</div>
         <div class="vn-avg-chip">%GT 5D: ${pctCell(sectorPct5d)}</div>
       </div>
@@ -596,7 +596,7 @@ function renderVnSector(sector, rows, sectorPct1d, sectorPct5d) {
             <th onclick="sortVnBy('symbol')"   data-vncol="symbol"   ># SYMBOL <span class="sort-arrow">${vnSortCol==='symbol' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
             <th onclick="sortVnBy('pctVol1d')" data-vncol="pctVol1d" class="${vnSortCol==='pctVol1d'?'active':''}">%VOL 1D <span class="sort-arrow">${vnSortCol==='pctVol1d' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
             <th onclick="sortVnBy('pctVol5d')" data-vncol="pctVol5d" class="${vnSortCol==='pctVol5d'?'active':''}">%VOL 5D <span class="sort-arrow">${vnSortCol==='pctVol5d' ? (vnSortDir==='desc'?'↓':'↑') : '↕'}</span></th>
-            <th>GT KHỚP CHỦ ĐỘNG HÔM NAY</th>
+            <th>GT KHỚP CHỦ ĐỘNG HÔM QUA</th>
             <th>TREND 5D</th>
           </tr>
         </thead>
