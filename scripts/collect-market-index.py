@@ -67,6 +67,7 @@ for db_symbol, cafef_symbol in INDICES.items():
             item = items[0]
             value_ty = item.get("GiaTriKhopLenh", 0) or 0
             value    = float(value_ty) * 1_000_000_000
+            print(f"{db_symbol} RAW: {item}")
 
             if value == 0:
                 print(f"{db_symbol}: GT=0 cho {cafef_date} — thử ngày trước")
