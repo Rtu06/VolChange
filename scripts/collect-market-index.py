@@ -65,6 +65,9 @@ for db_symbol, cafef_symbol in INDICES.items():
                 print(f"{db_symbol}: API Success=false — {data.get('Message')}")
             else:
                 items = data.get("Data", {}).get("Data", [])
+                print(f"{db_symbol} DEBUG: items_count={len(items)}")
+                for item in items:
+                    print(f"{db_symbol} DEBUG ITEM: {item}")
                 for item in items:
                     raw_date = item.get("Ngay", "")
                     try:
